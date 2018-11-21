@@ -5,7 +5,7 @@ module Wamp
 
     # This class is used to contain the run loop the executes on a worker
     class RunLoop
-      attr_reader :options, :client, :remote, :name, :requests,
+      attr_reader :options, :client, :proxy, :name, :requests,
                   :registrations, :subscriptions, :active, :verbose
 
       # Constructor
@@ -16,9 +16,11 @@ module Wamp
         @requests = {}
         @name = self.options[:name] || :default
         @client = self.options[:client] || Wamp::Client::Connection.new(self.options)
-        @remote = Redis::Remote.new(self.name, self.options[:redis])
         @verbose = self.options[:verbose]
         @active = false
+
+        dispatcher = Redis::Dispatcher.new(self.name, self.options[:redis])
+        @proxy = Proxy::Worker.new(dispatcher)
       end
 
       # Starts the run loop
@@ -27,18 +29,20 @@ module Wamp
 
         # Run this process on every EM tick
         EM.tick_loop do
-          self.loop
+          # Check for new requests
+          self.proxy.process_requests
         end
 
-        # Print message on session join
-        self.client.on(:connected) do |session, details|
+        self.client.on(:join) do |session, details|
           puts "WORKER '#{self.name}' connected to the router" if self.verbose
+          self.proxy.session = session
           @active = true
         end
 
         # Print message on session join
-        self.client.on(:disconnected) do |reason, details|
+        self.client.on(:leave) do |reason, details|
           puts "WORKER '#{self.name}' disconnected from the router with reason '#{reason}'" if self.verbose
+          self.proxy.session = nil
           @active = false
         end
 
@@ -52,23 +56,6 @@ module Wamp
 
         # Stop the even machine
         self.client.close
-      end
-
-      # Executes on each EM tick
-      def loop
-        # Increment the ticker to show that the worker is still alive
-        self.remote.increment_tick
-
-        # Loop until all requests have been serviced
-        no_requests = false
-        until no_requests do
-          request = self.remote.get_request
-          if request
-            # TODO: Process the request
-          else
-            no_requests = true
-          end
-        end
       end
 
     end

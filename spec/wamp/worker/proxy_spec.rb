@@ -102,6 +102,13 @@ describe Wamp::Worker::Proxy do
       expect(descriptor.handle).to eq(handle)
       expect(descriptor.params[:error][:error]).to eq("unsupported proxy command 'bad'")
     end
+
+    it "increments the tick" do
+      worker.process_requests
+      expect{
+        worker.process_requests
+      }.to change{ redis.get(dispatcher.get_tick_key) }.by(1)
+    end
   end
 end
 

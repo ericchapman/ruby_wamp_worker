@@ -64,13 +64,15 @@ module Wamp
         #
         # @param dispatcher [Wamp::Worker::Redis::dispatcher] - The dispatcher
         # @param session [Wamp::Client::Session] - The session for making the call
-        def initialize(dispatcher, session)
+        def initialize(dispatcher, session=nil)
           @dispatcher = dispatcher
           @session = session
         end
 
         # Processes the pending requests that are in the queue
         def process_requests
+          # Increment the ticker
+          self.dispatcher.increment_tick
 
           # Exit if there is no session.  This will keep the items pending until
           # the session is re-established
