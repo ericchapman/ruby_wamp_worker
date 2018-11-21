@@ -1,5 +1,5 @@
 require "wamp/worker/version"
-require "wamp/worker/session_proxy"
+require "wamp/worker/proxy"
 require "wamp/worker/redis"
 
 module Wamp
