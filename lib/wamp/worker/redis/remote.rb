@@ -1,4 +1,5 @@
 require_relative "base"
+require "json"
 
 module Wamp
   module Worker
