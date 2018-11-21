@@ -1,7 +1,6 @@
 require "wamp/worker/version"
 require "wamp/worker/session_proxy"
-require "wamp/worker/redis/remote"
-require "wamp/worker/redis/worker"
+require "wamp/worker/redis"
 
 module Wamp
   module Worker
@@ -11,6 +10,20 @@ module Wamp
     # @param name [Symbol] - The name of the worker
     # @return [Session] - An object allowing session calls to be made
     def self.session(name)
+
+    end
+
+    # Constructor
+    #
+    # @param name [Symbol] - The name of the worker
+    def initialize
+
+    end
+
+    # Main Event Machine Loop
+    #
+    #
+    def main
 
     end
   end

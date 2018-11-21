@@ -19,6 +19,10 @@ class RedisStub
     self.data[key]
   end
 
+  def set(key, value, options={})
+    self.data[key] = value
+  end
+
   def delete(key)
     self.data.delete(key)
     1
