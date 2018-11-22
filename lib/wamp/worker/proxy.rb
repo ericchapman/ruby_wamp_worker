@@ -1,17 +1,19 @@
+require_relative "redis"
+
 module Wamp
   module Worker
     module Proxy
 
-      # This class serves as a proxy for the requestor to access the session
-      class Session
-        attr_reader :requestor
+      class Base
+        attr_reader :queue
 
-        # Constructor
-        #
-        # @param requestor [Wamp::Worker::Redis::Requestor] - The requestor
-        def initialize(requestor)
-          @requestor = requestor
+        def initialize(redis, name)
+          @queue = Wamp::Worker::Redis::Queue.new(redis, name)
         end
+      end
+
+      # This class serves as a proxy for the requestor to access the session
+      class Requestor < Base
 
         # Performs the session "call" method
         def call(procedure, args=nil, kwargs=nil, options={}, &callback)
@@ -20,7 +22,7 @@ module Wamp
           params = { procedure: procedure, args: args, kwargs: kwargs, options: options }
 
           # Execute the command
-          execute :call, params, &callback
+          execute :call, params, true, &callback
         end
 
         # Performs the session "publish" method
@@ -30,62 +32,66 @@ module Wamp
           params = { topic: topic , args: args, kwargs: kwargs, options: options }
 
           # Execute the command
-          execute :publish, params, &callback
+          execute :publish, params, options[:acknowledge], &callback
         end
 
         private
 
         # Method to push the request and wait for the response
-        def execute(command, params)
+        def execute(command, params, wait=true)
 
           # Push the request
-          handle = self.requestor.push_request command, params
+          handle = self.queue.push_request command, params
 
-          # Wait for the response
-          descriptor = self.requestor.pop_response(handle)
+          if wait
+            # Wait for the response
+            descriptor = self.queue.pop_response(handle)
 
-          # Return the values
-          if block_given?
-            response = [descriptor.params[:result], descriptor.params[:error], descriptor.params[:details]]
-            yield(*response)
+            # Return the values
+            if block_given?
+              response = [descriptor.params[:result], descriptor.params[:error], descriptor.params[:details]]
+              yield(*response)
+            end
           end
         end
-
 
       end
 
       # This class serves as a proxy for the dispatcher to receive commands
       # from the requestor and return the results
-      class Worker
-        attr_reader :dispatcher
+      class Dispatcher < Base
         attr_accessor :session
 
         # Constructor
         #
-        # @param dispatcher [Wamp::Worker::Redis::dispatcher] - The dispatcher
-        # @param session [Wamp::Client::Session] - The session for making the call
-        def initialize(dispatcher, session=nil)
-          @dispatcher = dispatcher
-          @session = session
+        def initialize(redis, name, session=nil)
+          super redis, name
+          self.session = session
         end
 
         # Processes the pending requests that are in the queue
         def process_requests
+
           # Increment the ticker
-          self.dispatcher.increment_tick
+          self.queue.increment_tick
 
           # Exit if there is no session.  This will keep the items pending until
           # the session is re-established
           return unless self.session
 
-          # Clear out the request queue
-          request = self.dispatcher.pop_request
-          while request
+          # Iterate through the requests
+          loop do
+
+            # Get the next request
+            request = self.queue.pop_request
+
+            # Break if there are no more requests
+            break unless request
 
             # Create the callback
             callback = -> result, error, details {
               params = { result: result, error: error, details: details }
-              self.dispatcher.push_response request.command, request.handle, params
+              self.queue.push_response request.command, request.handle, params
             }
 
             # Call the session
@@ -119,8 +125,6 @@ module Wamp
 
             end
 
-            # Check for the next request
-            request = self.dispatcher.pop_request
           end
         end
 

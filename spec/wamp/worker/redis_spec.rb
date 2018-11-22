@@ -3,53 +3,71 @@ require "spec_helper"
 describe Wamp::Worker::Redis do
   let(:redis) { RedisStub.new }
   let(:name) { :default }
-  let(:req_queue) { described_class::Requestor.new(redis, name) }
-  let(:res_queue) { described_class::Dispatcher.new(redis, name) }
+  let(:queue) { described_class::Queue.new(redis, name) }
 
   it "round trip request/response" do
     # Push the request
     params = { temp: true }
-    handle = req_queue.push_request :call, params
+    handle = queue.push_request :call, params
 
     # Pop the request
-    request = res_queue.pop_request
+    request = queue.pop_request
     expect(request.command).to eq(:call)
     expect(request.handle).to eq(handle)
     expect(request.params).to eq(params)
 
     # Push the response
     params = { temp: false }
-    res_queue.push_response :call, handle, params
+    queue.push_response :call, handle, params
 
     # Pop the response
-    response = req_queue.pop_response handle
+    response = queue.pop_response handle
     expect(response.command).to eq(:call)
     expect(response.handle).to eq(handle)
     expect(response.params).to eq(params)
 
     # Raises and error because there was not response
     expect {
-      req_queue.pop_response(handle)
+      queue.pop_response(handle)
     }.to raise_error(described_class::ValueAlreadyRead)
   end
 
-  it "timesout with worker not responding" do
+  it "timeout with worker not responding" do
     # Push the request
     params = { temp: true }
-    handle = req_queue.push_request :call, params
+    handle = queue.push_request :call, params
 
     # Pop the request
-    res_queue.pop_request
+    queue.pop_request
 
     # Raises and error because there was not response
     expect {
-      req_queue.pop_response(handle)
+      queue.pop_response(handle)
     }.to raise_error(described_class::WorkerNotResponding)
+  end
+
+  it "timeout with no response" do
+    old_timeout = Wamp::Worker.config.timeout
+    Wamp::Worker.config.timeout = 0
+
+    # Push the request
+    params = { temp: true }
+    handle = queue.push_request :call, params
+
+    # Pop the request
+    queue.pop_request
+
+    # Raises and error because there was not response
+    expect {
+      queue.pop_response(handle)
+    }.to raise_error(described_class::ResponseTimeout)
+
+    Wamp::Worker.config.timeout = old_timeout
   end
 
   it "resets the timeout counter" do
     count = 0
-    timeout = req_queue.class::TIMEOUT
+    timeout = queue.class::IDLE_TIMEOUT
     handle = nil
     params = { temp: true }
 
@@ -57,10 +75,10 @@ describe Wamp::Worker::Redis do
       if key.include?("tick")
         if count == timeout-10
           # Reset just before the timeout
-          res_queue.increment_tick
+          queue.increment_tick
         elsif count == timeout+10
           # REspond after the timeout would have occurred
-          res_queue.push_response :call, handle, params
+          queue.push_response :call, handle, params
         end
         count += 1
       end
@@ -69,10 +87,10 @@ describe Wamp::Worker::Redis do
     end
 
     # Make the request
-    handle = req_queue.push_request :call, params
+    handle = queue.push_request :call, params
 
     # Pop the response
-    response = req_queue.pop_response handle
+    response = queue.pop_response handle
     expect(response.command).to eq(:call)
     expect(response.handle).to eq(handle)
     expect(response.params).to eq(params)
