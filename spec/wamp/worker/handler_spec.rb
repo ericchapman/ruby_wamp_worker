@@ -13,8 +13,8 @@ describe Wamp::Worker::Handler do
 
     config = Wamp::Worker.config
 
-    expect(config.subscriptions.count).to eq(1)
-    expect(config.subscriptions(:other).count).to eq(2)
+    expect(config.subscriptions.count).to eq(2)
+    expect(config.subscriptions(:other).count).to eq(3)
 
     subscriptions = config.subscriptions(:other)
 
@@ -24,11 +24,15 @@ describe Wamp::Worker::Handler do
     expect(subscription.options).to eq({match: true})
 
     subscription = subscriptions[1]
+    expect(subscription.klass).to eq(SubscribeBackgroundHandler)
+    expect(subscription.topic).to eq("com.example.topic1_back")
+
+    subscription = subscriptions[2]
     expect(subscription.klass).to eq(SubscribeHandler)
     expect(subscription.topic).to eq("com.example.topic2")
 
-    expect(config.registrations.count).to eq(1)
-    expect(config.registrations(:other).count).to eq(2)
+    expect(config.registrations.count).to eq(2)
+    expect(config.registrations(:other).count).to eq(4)
 
     registrations = config.registrations(:other)
 
@@ -37,8 +41,16 @@ describe Wamp::Worker::Handler do
     expect(registration.procedure).to eq("com.example.procedure1")
 
     registration = registrations[1]
+    expect(registration.klass).to eq(RegisterBackgroundHandler)
+    expect(registration.procedure).to eq("com.example.procedure1_back")
+
+    registration = registrations[2]
     expect(registration.klass).to eq(RegisterHandler)
     expect(registration.procedure).to eq("com.example.procedure2")
+
+    registration = registrations[3]
+    expect(registration.klass).to eq(RegisterBackgroundHandler)
+    expect(registration.procedure).to eq("com.example.procedure2_back")
   end
 
 end

@@ -5,20 +5,28 @@ describe Wamp::Worker::Runner do
   before(:each) {
     @topic = "com.example.topic"
     @procedure = "com.example.procedure"
+    @back = "_back"
 
     # Override the config
     config = Wamp::Worker::Config.new
     allow(Wamp::Worker).to receive(:config).and_return(config)
 
+    # Override redis
+    redis = RedisStub.new
+    allow(::Redis).to receive(:new).and_return(redis)
+
     # Can't see them in the block
     topic = @topic
     procedure = @procedure
+    back = @back
 
     # Create the subscriptions
     Wamp::Worker.configure do
       namespace :test do
         subscribe topic, SubscribeHandler
         register procedure, RegisterHandler
+        subscribe topic+back, SubscribeBackgroundHandler
+        register procedure+back, RegisterBackgroundHandler
       end
     end
   }
@@ -40,14 +48,33 @@ describe Wamp::Worker::Runner do
     expect(runner.proxy.session).to be(runner.client.session)
 
     # Check that the handlers get called
-    runner.proxy.session.call @procedure, [3] do |result, error, details|
-      expect(result[:args][0]).to eq(5)
-    end
-    runner.proxy.session.publish @topic
 
-    # Check that the handlers were called
-    expect(SubscribeHandler.run_count).to eq(1)
-    expect(RegisterHandler.run_count).to eq(1)
+    expect {
+      runner.proxy.session.call @procedure, [3] do |result, error, details|
+        expect(result[:args][0]).to eq(5)
+      end
+    }.to change{ RegisterHandler.run_count }.by(1)
+
+    expect {
+      runner.proxy.session.publish @topic
+    }.to change{ SubscribeHandler.run_count }.by(1)
+
+    allow_any_instance_of(SessionStub).to receive(:yield) do |session, request, result, options, check_defer|
+      expect(result.args[0]).to eq(5)
+    end
+
+    expect {
+      runner.proxy.session.call @procedure+@back, [3] do |result, error, details|
+        expect(result[:args][0].is_a?(Wamp::Client::Defer::CallDefer)).to eq(true)
+      end
+
+      runner.tick_handler
+    }.to change{ RegisterBackgroundHandler.run_count }.by(1)
+
+    expect {
+      runner.proxy.session.publish @topic+@back
+      runner.tick_handler
+    }.to change{ SubscribeBackgroundHandler.run_count }.by(1)
 
     # Stop the runner
     runner.stop

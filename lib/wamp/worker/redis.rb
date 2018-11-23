@@ -25,7 +25,7 @@ module Wamp
         def initialize(command, handle, params)
           @command = command.to_sym
           @handle = handle
-          @params = params
+          @params = params || {}
         end
 
         # Create a Descriptor object from the json payload
@@ -66,7 +66,7 @@ module Wamp
       # where "id" is a code used to uniquely identify the response.  Note that at
       # startup, all of the remaining responses will be wiped (cleanup)
       class Queue
-        attr_reader :redis, :name, :timeout
+        attr_reader :redis, :name, :timeout, :uuid
 
         IDLE_TIMEOUT = 100
 
@@ -78,6 +78,7 @@ module Wamp
           @redis = redis
           @name = name
           @timeout = Wamp::Worker::CONFIG.timeout
+          @uuid = ENV['DYNO'] || SecureRandom.hex(12)
         end
 
         # Returns the tick key for the worker
@@ -99,6 +100,13 @@ module Wamp
         # @return [String] - The key for the new handle
         def get_new_handle
           "wamp:#{self.name}:response:#{SecureRandom.hex(12)}"
+        end
+
+        # Returns a key for the worker for background responses
+        #
+        # @return [String] - The key for the worker
+        def get_background_key
+          "wamp:#{self.name}:background:#{self.uuid}"
         end
 
         #region Request Handler
@@ -220,6 +228,37 @@ module Wamp
 
           # Return the parsed descriptor
           Descriptor.from_json(response)
+        end
+
+        #endregion
+
+        #region Background Handler
+
+        # Pushes background responses back to the worker
+        #
+        def push_background(command, handle, params)
+
+          # Create the descriptor
+          descriptor = Descriptor.new(command, handle, params)
+
+          # Queue the command
+          self.redis.lpush(handle, descriptor.to_json)
+
+        end
+
+        # Pops background responses
+        #
+        def pop_background
+
+          # Retrieve the request
+          request = self.redis.rpop(self.get_background_key)
+
+          # If there is a request, parse it and return it.  Else return nil
+          if request
+            Descriptor.from_json(request)
+          else
+            nil
+          end
         end
 
         #endregion

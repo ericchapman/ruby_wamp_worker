@@ -26,4 +26,5 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency 'wamp_client', '~> 0.1.1'
   spec.add_dependency 'redis'
+  spec.add_dependency 'sidekiq'
 end

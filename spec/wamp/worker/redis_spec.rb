@@ -32,6 +32,18 @@ describe Wamp::Worker::Redis do
     }.to raise_error(described_class::ValueAlreadyRead)
   end
 
+  it "round trip background" do
+    # Push the request
+    params = { temp: true }
+    queue.push_background :yield, queue.get_background_key, params
+
+    # Pop the request
+    request = queue.pop_background
+    expect(request.command).to eq(:yield)
+    expect(request.handle).to eq(queue.get_background_key)
+    expect(request.params).to eq(params)
+  end
+
   it "timeout with worker not responding" do
     # Push the request
     params = { temp: true }

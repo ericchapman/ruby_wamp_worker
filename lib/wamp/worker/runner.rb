@@ -17,7 +17,7 @@ module Wamp
 
         # Create the dispatcher proxy
         redis = Wamp::Worker.config.redis(self.name)
-        @proxy = Proxy::Dispatcher.new(self.name, redis)
+        @proxy = Proxy::Dispatcher.new(redis, self.name)
 
         # Add the tick loop handler
         self.client.transport_class.add_tick_loop { self.tick_handler }
@@ -70,7 +70,7 @@ module Wamp
         # Subscribe to the topics
         Wamp::Worker.config.subscriptions(self.name).each do |s|
           handler = -> a, k, d {
-            s.klass.new(session, a, k, d).invoke
+            s.klass.create(self.proxy, :subscription, a, k, d).invoke
           }
           session.subscribe(s.topic, handler, s.options)
         end
@@ -78,7 +78,7 @@ module Wamp
         # Register for the procedures
         Wamp::Worker.config.registrations(self.name).each do |r|
           handler = -> a,k,d  {
-            r.klass.new(session, a, k, d).invoke
+            r.klass.create(self.proxy, :procedure, a, k, d).invoke
           }
           session.register(r.procedure, handler, r.options)
         end

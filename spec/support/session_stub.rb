@@ -65,5 +65,6 @@ class SessionStub
     end
   end
 
-
+  def yield(request, result, options={}, check_defer=false)
+  end
 end

@@ -8,5 +8,8 @@ require "wamp/worker"
 
 Dir[File.expand_path('spec/support/**/*.rb')].each { |f| require f }
 
+require 'sidekiq/testing'
+Sidekiq::Testing.inline!
+
 RSpec.configure do |config|
 end
