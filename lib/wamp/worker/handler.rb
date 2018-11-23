@@ -1,47 +1,9 @@
 module Wamp
   module Worker
 
-    #region Storage Objects
-    class Base
-      attr_reader :klass, :options
-
-      def initialize(klass, options)
-        @klass = klass
-        @options = options
-
-        raise TypeError.new("'klass' must be a Wamp::Worker::Handler type") unless klass.ancestors.include? Handler
-      end
-    end
-
-    class Registration < Base
-      attr_reader :procedure
-
-      def initialize(procedure, klass, options)
-        super klass, options
-        @procedure = procedure
-      end
-    end
-
-    class Subscription < Base
-      attr_reader :topic
-
-      def initialize(topic, klass, options)
-        super klass, options
-        @topic = topic
-      end
-    end
-    #endregion
-
     class Handler
       attr_reader :session, :args, :kwargs, :details
 
-      def self.subscriptions
-        @@subscriptions ||= []
-      end
-
-      def self.registrations
-        @@registrations ||= []
-      end
 
       # Constructor
       #
@@ -57,8 +19,11 @@ module Wamp
       # @param topic [String] - The topic to subscribe to
       # @param klass [Wamp::Worker::Handler] - The class to use
       # @param options [Hash] - Options for the subscription
-      def self.subscribe(topic, klass=nil, **options)
-        self.subscriptions << Subscription.new(topic, (klass || self), options)
+      def self.subscribe(topic, klass=nil, name: nil, **options)
+        klass ||= self
+        Wamp::Worker::configure name do
+          subscribe topic, klass, **options
+        end
       end
 
       # Register the handler for a procedure
@@ -66,8 +31,11 @@ module Wamp
       # @param procedure [String] - The procedure to register for
       # @param klass [Wamp::Worker::Handler] - The class to use
       # @param options [Hash] - Options for the subscription
-      def self.register(procedure, klass=nil, **options)
-        self.registrations << Registration.new(procedure, (klass || self), options)
+      def self.register(procedure, klass=nil, name: nil,**options)
+        klass ||= self
+        Wamp::Worker::configure name do
+          register procedure, klass, **options
+        end
       end
 
       # The method that is called to parse the data.  Override this

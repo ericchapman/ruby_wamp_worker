@@ -47,8 +47,8 @@ describe Wamp::Worker::Redis do
   end
 
   it "timeout with no response" do
-    old_timeout = Wamp::Worker.config.timeout
-    Wamp::Worker.config.timeout = 0
+    old_timeout = Wamp::Worker.config[:default][:timeout]
+    Wamp::Worker.config[:default][:timeout] = 0
 
     # Push the request
     params = { temp: true }
@@ -62,7 +62,7 @@ describe Wamp::Worker::Redis do
       queue.pop_response(handle)
     }.to raise_error(described_class::ResponseTimeout)
 
-    Wamp::Worker.config.timeout = old_timeout
+    Wamp::Worker.config[:default][:timeout] = old_timeout
   end
 
   it "resets the timeout counter" do

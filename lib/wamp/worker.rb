@@ -3,53 +3,28 @@ require "wamp/worker/proxy"
 require "wamp/worker/redis"
 require "wamp/worker/handler"
 require "wamp/worker/runner"
+require "wamp/worker/config"
 require "redis"
 
 module Wamp
   module Worker
 
-    # This class is used to store the configuration of the worker
-    class Config
-      attr_reader :connections
-      attr_writer :redis
-      attr_accessor :timeout
-
-      def initialize
-        @connections = {}
-        @timeout = 60
-      end
-
-      # Method to configure the registrations and subscriptions
-      def routes(&callback)
-        Handler.instance_eval(&callback)
-      end
-
-      # Adds a connection
-      def add_connection(name, **options)
-        self.connections[name] = options
-      end
-
-      # Returns the redis object
-      def redis
-        if @redis == nil
-          ::Redis.new
-        elsif @redis.is_a? ::Redis
-          @redis
-        else
-          # TODO: Exception?
-        end
-      end
-    end
-
     # The global config object
     CONFIG = Config.new
+
+    # Returns the config object
+    #
+    # @param name [Symbol] - The name of the connection
+    # @return [Config] - Returns the global config object
     def self.config
       CONFIG
     end
 
     # Method to configure the worker
-    def self.setup(&callback)
-      callback.call(CONFIG)
+    #
+    # @param name [Symbol] - The name of the connection
+    def self.configure(name=nil, &callback)
+      ConfigProxy.new(self.config, name).configure(&callback)
     end
 
     # Method to start a worker

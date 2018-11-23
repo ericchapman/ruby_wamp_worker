@@ -6,7 +6,7 @@ end
 
 class Handler2 < Wamp::Worker::Handler
   register "com.example.procedure1"
-  register "com.example.procedure2"
+  register "com.example.procedure2", name: :other
 
   def invoke
     self.args[0] + 2
@@ -16,30 +16,40 @@ end
 describe Wamp::Worker::Handler do
 
   it "registers the handlers" do
-    Wamp::Worker.setup do |config|
-      config.routes do
+
+    # Globally subscribe
+    Wamp::Worker.configure do
+      namespace :other do
         subscribe "com.example.topic2", Handler1
       end
     end
 
-    expect(described_class.subscriptions.count).to eq(2)
+    config = Wamp::Worker.config
 
-    subscription = described_class.subscriptions[0]
+    expect(config.subscriptions.count).to eq(1)
+    expect(config.subscriptions(:other).count).to eq(2)
+
+    subscriptions = config.subscriptions(:other)
+
+    subscription = subscriptions[0]
     expect(subscription.klass).to eq(Handler1)
     expect(subscription.topic).to eq("com.example.topic1")
     expect(subscription.options).to eq({match: true})
 
-    subscription = described_class.subscriptions[1]
+    subscription = subscriptions[1]
     expect(subscription.klass).to eq(Handler1)
     expect(subscription.topic).to eq("com.example.topic2")
 
-    expect(described_class.registrations.count).to eq(2)
+    expect(config.registrations.count).to eq(1)
+    expect(config.registrations(:other).count).to eq(2)
 
-    registration = described_class.registrations[0]
+    registrations = config.registrations(:other)
+
+    registration = registrations[0]
     expect(registration.klass).to eq(Handler2)
     expect(registration.procedure).to eq("com.example.procedure1")
 
-    registration = described_class.registrations[1]
+    registration = registrations[1]
     expect(registration.klass).to eq(Handler2)
     expect(registration.procedure).to eq("com.example.procedure2")
   end
