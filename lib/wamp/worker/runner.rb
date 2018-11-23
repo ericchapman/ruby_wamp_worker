@@ -6,20 +6,26 @@ module Wamp
 
     # This class is used to contain the run loop the executes on a worker
     class Runner
-      attr_reader :options, :client, :proxy, :name, :redis, :verbose
+      attr_reader :options, :client, :proxy, :name, :verbose
 
       # Constructor
-      def initialize(name, redis, **options)
+      def initialize(name, **options)
         @options = options
         @name = name
-        @redis = redis
         @client = self.options[:client] || Wamp::Client::Connection.new(self.options)
         @verbose = self.options[:verbose]
-        @proxy = Proxy::Dispatcher.new(self.name, self.redis)
+
+        # Create the dispatcher proxy
+        redis = Wamp::Worker.config.redis(self.name)
+        @proxy = Proxy::Dispatcher.new(self.name, redis)
+
+        # Add the tick loop handler
+        self.client.transport_class.add_tick_loop { self.tick_handler }
       end
 
       # Returns true if the connection is active
       #
+      # @return [Bool] - true if the runner is active
       def active?
         self.proxy.session != nil
       end
@@ -28,45 +34,20 @@ module Wamp
       def start
         return if self.active?
 
-        # Run this process on every EM tick
-        EM.tick_loop do
-          # Check for new requests
-          self.proxy.process_requests
-        end
-
         # On join, we need to subscribe and register the different handlers
-        self.client.on(:join) do |session, details|
-          puts "WORKER '#{self.name}' connected to the router" if self.verbose
-
-          # Set the session
-          self.proxy.session = session
-
-          # Subscribe to the topics
-          Wamp::Worker::Handler.subscriptions.each do |s|
-            session.subscribe(s.topic, s.options) do |args, kwargs, details|
-              s.klass.new(session, args, kwargs, details).invoke
-            end
-          end
-
-          # Register for the procedures
-          Wamp::Worker::Handler.registrations.each do |r|
-            session.register(r.procedure, r.options) do |args, kwargs, details|
-              r.klass.new(session, args, kwargs, details).invoke
-            end
-          end
+        self.client.on :join do |session, details|
+          self.join_handler session, details
         end
 
         # On leave, we will print a message
-        self.client.on(:leave) do |reason, details|
-          puts "WORKER '#{self.name}' disconnected from the router with reason '#{reason}'" if self.verbose
-
-          # Clear the session
-          self.proxy.session = nil
+        self.client.on :leave do |reason, details|
+          self.leave_handler(reason, details)
         end
 
         # On challenge, we will run the users challenge code
-        challenge = self.options[:challange]
-        self.client.on(:challenge, challenge) if challenge
+        self.client.on :challenge do |authmethod, details|
+          self.challenge_handler(authmethod, details)
+        end
 
         # Start the connection
         self.client.open
@@ -78,6 +59,49 @@ module Wamp
 
         # Stop the even machine
         self.client.close
+      end
+
+      def join_handler(session, details)
+        puts "WORKER '#{self.name}' connected to the router" if self.verbose
+
+        # Set the session
+        self.proxy.session = session
+
+        # Subscribe to the topics
+        Wamp::Worker.config.subscriptions(self.name).each do |s|
+          handler = -> a, k, d {
+            s.klass.new(session, a, k, d).invoke
+          }
+          session.subscribe(s.topic, handler, s.options)
+        end
+
+        # Register for the procedures
+        Wamp::Worker.config.registrations(self.name).each do |r|
+          handler = -> a,k,d  {
+            r.klass.new(session, a, k, d).invoke
+          }
+          session.register(r.procedure, handler, r.options)
+        end
+      end
+
+      def leave_handler(reason, details)
+        puts "WORKER '#{self.name}' disconnected from the router with reason '#{reason}'" if self.verbose
+
+        # Clear the session
+        self.proxy.session = nil
+      end
+
+      def challenge_handler(authmethod, extra)
+        challenge = self.options[:challenge]
+        if challenge
+          challenge.call(authmethod, extra)
+        else
+          raise RuntimeError, "client asked for '#{authmethod}' challenge, but no ':challenge' option was provided"
+        end
+      end
+
+      def tick_handler
+        self.proxy.process_requests
       end
 
     end

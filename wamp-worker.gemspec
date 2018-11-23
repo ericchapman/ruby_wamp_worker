@@ -24,6 +24,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'simplecov'
   spec.add_development_dependency 'codecov'
 
-  spec.add_dependency 'wamp_client', '~> 0.1.0'
+  spec.add_dependency 'wamp_client', '~> 0.1.1'
   spec.add_dependency 'redis'
 end

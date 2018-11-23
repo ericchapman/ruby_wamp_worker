@@ -28,12 +28,24 @@ class SessionStub
 
     if registration
       result = registration.call(args, kwargs, {})
+      if result.nil?
+        result = Wamp::Client::CallResult.new
+      elsif result.is_a?(Wamp::Client::CallError)
+        error = result.error
+        result = nil
+      elsif not result.is_a?(Wamp::Client::CallResult)
+        result = Wamp::Client::CallResult.new([result])
+      end
     else
       error = "no registration found"
     end
 
     if callback
-      callback.call(result, error, { procedure: procedure })
+      if result
+        callback.call({args: result.args, kwargs: result.kwargs}, error, { procedure: procedure })
+      else
+        callback.call(nil, error, { procedure: procedure })
+      end
     end
   end
 
