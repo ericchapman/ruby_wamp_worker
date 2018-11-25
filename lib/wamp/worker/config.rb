@@ -4,31 +4,32 @@ module Wamp
   module Worker
 
     #region Storage Objects
-    class Base
-      attr_reader :klass, :options
+    class Handle
+      attr_reader :klass, :method, :options
 
-      def initialize(klass, options)
+      def initialize(klass, method, options)
         @klass = klass
+        @method = method
         @options = options
 
-        raise TypeError.new("'klass' must be a Wamp::Worker::Handler type") unless klass.ancestors.include? Handler
+        raise TypeError.new("'klass' must be a Wamp::Worker::Handler type") unless klass.ancestors.include? BaseHandler
       end
     end
 
-    class Registration < Base
+    class Registration < Handle
       attr_reader :procedure
 
-      def initialize(procedure, klass, options)
-        super klass, options
+      def initialize(procedure, klass, method, options)
+        super klass, method, options
         @procedure = procedure
       end
     end
 
-    class Subscription < Base
+    class Subscription < Handle
       attr_reader :topic
 
-      def initialize(topic, klass, options)
-        super klass, options
+      def initialize(topic, klass, method, options)
+        super klass, method, options
         @topic = topic
       end
     end
@@ -66,10 +67,11 @@ module Wamp
       #
       # @param topic [String] - The topic to subscribe to
       # @param klass [Wamp::Worker::Handler] - The class to use
+      # @param method [Symbol] - The name of the method to execute
       # @param options [Hash] - Options for the subscription
-      def subscribe(topic, klass, **options)
+      def subscribe(topic, klass, method, **options)
         subscriptions = self[:subscriptions] || []
-        subscriptions << Subscription.new(topic, klass, options)
+        subscriptions << Subscription.new(topic, klass, method, options)
         self[:subscriptions] = subscriptions
       end
 
@@ -77,10 +79,11 @@ module Wamp
       #
       # @param procedure [String] - The procedure to register for
       # @param klass [Wamp::Worker::Handler] - The class to use
+      # @param method [Symbol] - The name of the method to execute
       # @param options [Hash] - Options for the subscription
-      def register(procedure, klass, **options)
+      def register(procedure, klass, method, **options)
         registrations = self[:registrations] || []
-        registrations << Registration.new(procedure, klass, options)
+        registrations << Registration.new(procedure, klass, method, options)
         self[:registrations] = registrations
       end
 

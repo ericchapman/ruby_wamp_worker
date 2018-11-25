@@ -13,3 +13,7 @@ Sidekiq::Testing.inline!
 
 RSpec.configure do |config|
 end
+
+def stub_redis
+  allow(::Redis).to receive(:new).and_return(RedisStub.new)
+end

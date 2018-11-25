@@ -1,9 +1,10 @@
 class SessionStub
-  attr_reader :subscriptions, :registrations
+  attr_reader :subscriptions, :registrations, :defers
 
   def initialize
     @subscriptions = {}
     @registrations = {}
+    @defers = {}
   end
 
   def publish(topic, args=nil, kwargs=nil, options={}, &callback)
@@ -23,13 +24,25 @@ class SessionStub
 
   def call(procedure, args=nil, kwargs=nil, options={}, &callback)
     registration = self.registrations[procedure]
+    request = SecureRandom.uuid
     result = nil
     error = nil
 
     if registration
-      result = registration.call(args, kwargs, {})
+      begin
+        result = registration.call(args, kwargs, {request: request})
+      rescue Exception => e
+        if e.is_a? Wamp::Client::CallError
+          result = e
+        else
+          result = Wamp::Client::CallError.new("error")
+        end
+      end
+
       if result.nil?
         result = Wamp::Client::CallResult.new
+      elsif result.is_a?(Wamp::Client::Defer::CallDefer)
+        # Do nothing
       elsif result.is_a?(Wamp::Client::CallError)
         error = result.error
         result = nil
@@ -41,7 +54,9 @@ class SessionStub
     end
 
     if callback
-      if result
+      if result.is_a?(Wamp::Client::Defer::CallDefer)
+        self.defers[request] = callback
+      elsif result
         callback.call({args: result.args, kwargs: result.kwargs}, error, { procedure: procedure })
       else
         callback.call(nil, error, { procedure: procedure })
@@ -66,5 +81,23 @@ class SessionStub
   end
 
   def yield(request, result, options={}, check_defer=false)
+    callback = self.defers.delete(request)
+    if callback
+      if result.nil?
+        result = Wamp::Client::CallResult.new
+      elsif result.is_a?(Wamp::Client::CallError)
+        # Do nothing
+      elsif not result.is_a?(Wamp::Client::CallResult)
+        result = Wamp::Client::CallResult.new([result])
+      end
+
+      if result.is_a?(Wamp::Client::CallError)
+        callback.call(nil, result.error, { request: request })
+      else
+        callback.call({ args: result.args, kwargs: result.kwargs }, nil, { request: request })
+      end
+    end
+
   end
+
 end

@@ -1,18 +1,50 @@
 require 'sidekiq'
 require 'wamp/client/defer'
+require 'json'
 
 module Wamp
   module Worker
 
-    class Handler
-      attr_reader :proxy, :command, :args, :kwargs, :details
+    module BaseHandler
+      def self.included(base)
+        attr_reader :proxy, :command, :args, :kwargs, :details
 
-      # Instantiates the object
-      #
-      def self.create(proxy, command, args, kwargs, details)
-        handler = self.new
-        handler.configure(proxy, command, args, kwargs, details)
-        handler
+        base.extend(ClassMethods)
+      end
+
+      module ClassMethods
+
+        # Instantiates the object
+        #
+        def create(proxy, command, args, kwargs, details)
+          handler = self.new
+          handler.configure(proxy, command, args, kwargs, details)
+          handler
+        end
+
+        # Subscribe the handler to a topic
+        #
+        # @param topic [String] - The topic to subscribe to
+        # @param method [Symbol] - The name of the method to execute
+        # @param options [Hash] - Options for the subscription
+        def subscribe(topic, method, name: nil, **options)
+          klass = self
+          Wamp::Worker::configure name do
+            subscribe topic, klass, method, **options
+          end
+        end
+
+        # Register the handler for a procedure
+        #
+        # @param procedure [String] - The procedure to register for
+        # @param method [Symbol] - The name of the method to execute
+        # @param options [Hash] - Options for the subscription
+        def register(procedure, method, name: nil, **options)
+          klass = self
+          Wamp::Worker::configure name do
+            register procedure, klass, method, **options
+          end
+        end
       end
 
       # Configures the handler
@@ -25,6 +57,16 @@ module Wamp
         @details = details || {}
       end
 
+    end
+
+    module Handler
+
+      def self.included(base)
+        base.class_eval do
+          include BaseHandler
+        end
+      end
+
       # Returns the session for the call
       #
       # @return [Wamp::Client::Session, Wamp::Worker::Proxy::Requestor]
@@ -32,46 +74,22 @@ module Wamp
         self.proxy.session
       end
 
-      # Subscribe the handler to a topic
-      #
-      # @param topic [String] - The topic to subscribe to
-      # @param klass [Wamp::Worker::Handler] - The class to use
-      # @param options [Hash] - Options for the subscription
-      def self.subscribe(topic, klass=nil, name: nil, **options)
-        klass ||= self
-        Wamp::Worker::configure name do
-          subscribe topic, klass, **options
-        end
-      end
-
-      # Register the handler for a procedure
-      #
-      # @param procedure [String] - The procedure to register for
-      # @param klass [Wamp::Worker::Handler] - The class to use
-      # @param options [Hash] - Options for the subscription
-      def self.register(procedure, klass=nil, name: nil,**options)
-        klass ||= self
-        Wamp::Worker::configure name do
-          register procedure, klass, **options
-        end
-      end
-
-      # The method that is called to parse the data.  Override this
-      # in the subclass
-      #
-      def handler
-      end
-
       # Method that invokes the handler
       #
-      def invoke
-        self.handler
+      def invoke(method)
+        self.send(method)
       end
 
     end
 
-    class BackgroundHandler < Handler
-      include ::Sidekiq::Worker
+    module BackgroundHandler
+
+      def self.included(base)
+        base.class_eval do
+          include BaseHandler
+          include ::Sidekiq::Worker
+        end
+      end
 
       # Returns the session for the call
       #
@@ -82,22 +100,28 @@ module Wamp
 
       # Method that is run when the process is invoked on the worker
       #
+      # @param method [Symbol] - The name of the method to execute
       # @param command [Symbol] - The command that is being backgrounded
       # @param args [Array] - The arguments for the handler
       # @param kwargs [Hash] - The keyword arguments for the handler
       # @param details [Hash] - Other details about the call
-      def perform(name, handle, command, args, kwargs, details)
+      def perform(name, method, handle, command, args, kwargs, details)
 
         # Create a proxy to act like the session
         redis = Wamp::Worker.config.redis(name)
         proxy = Wamp::Worker::Proxy::Requestor.new(redis, name)
+
+        # Deserialize the arguments as symbols
+        args = JSON.parse(args, :symbolize_names => true)
+        kwargs = JSON.parse(kwargs, :symbolize_names => true)
+        details = JSON.parse(details, :symbolize_names => true)
 
         # Configure the handler
         self.configure(proxy, command, args, kwargs, details)
 
         # Call the user code and make sure to catch exceptions
         begin
-          result = self.handler
+          result = self.send(method)
         rescue Exception => e
           if e.is_a? Wamp::Client::CallError
             result = e
@@ -131,16 +155,17 @@ module Wamp
 
       # Override the invoke method to push the process to the background
       #
-      def invoke
+      def invoke(method)
 
         # Schedule the task with Redis
         self.class.perform_async(
             self.proxy.name,
+            method,
             self.proxy.queue.get_background_key,
             self.command,
-            self.args,
-            self.kwargs,
-            self.details)
+            self.args.to_json,
+            self.kwargs.to_json,
+            self.details.to_json)
 
         # If it is a procedure, return a defer
         if self.command == :procedure

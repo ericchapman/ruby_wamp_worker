@@ -1,6 +1,10 @@
 require "spec_helper"
 
-class Handler1 < Wamp::Worker::Handler
+class Handler1
+  include Wamp::Worker::Handler
+
+  def handler
+  end
 end
 
 describe Wamp::Worker::Config do
@@ -12,8 +16,8 @@ describe Wamp::Worker::Config do
       timeout 100
       connection option: true
 
-      subscribe "topic", Handler1, match: true
-      register "procedure", Handler1
+      subscribe "topic", Handler1, :handler, match: true
+      register "procedure", Handler1, :handler
     end
 
     expect(config.connection).to eq({option: true})
@@ -29,20 +33,20 @@ describe Wamp::Worker::Config do
       redis Redis.new
       connection option: true, value: false
 
-      subscribe "topic1", Handler1
-      register "procedure1", Handler1
+      subscribe "topic1", Handler1, :handler
+      register "procedure1", Handler1, :handler
 
       namespace :other do
         timeout 200
         connection option: false
 
-        subscribe "topic2", Handler1
-        register "procedure2", Handler1, prefix: true
+        subscribe "topic2", Handler1, :handler
+        register "procedure2", Handler1, :handler, prefix: true
 
         namespace :another do
           timeout 300
 
-          register "procedure3", Handler1, prefix: true
+          register "procedure3", Handler1, :handler, prefix: true
         end
       end
     end

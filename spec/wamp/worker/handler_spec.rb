@@ -1,56 +1,111 @@
 require "spec_helper"
 
 describe Wamp::Worker::Handler do
+  let(:name) { :other }
+  let(:session) { SessionStub.new }
+  let(:redis) { Wamp::Worker.config.redis(name) }
+  let(:proxy) {
+    proxy = Wamp::Worker::Proxy::Dispatcher.new(redis, name)
+    proxy.session = session
+    proxy
+  }
+  before(:each) { stub_redis }
 
   it "registers the handlers" do
-
-    # Globally subscribe
-    Wamp::Worker.configure do
-      namespace :other do
-        subscribe "com.example.topic2", SubscribeHandler
-      end
-    end
-
     config = Wamp::Worker.config
 
     expect(config.subscriptions.count).to eq(2)
-    expect(config.subscriptions(:other).count).to eq(3)
+    expect(config.subscriptions(name).count).to eq(4)
 
-    subscriptions = config.subscriptions(:other)
+    expect(config.registrations.count).to eq(14)
+    expect(config.registrations(name).count).to eq(16)
+  end
 
-    subscription = subscriptions[0]
-    expect(subscription.klass).to eq(SubscribeHandler)
-    expect(subscription.topic).to eq("com.example.topic1")
-    expect(subscription.options).to eq({match: true})
+  it "executes the normal handlers" do
+    Wamp::Worker.subscribe_topics(name, proxy, session)
+    Wamp::Worker.register_procedures(name, proxy, session)
 
-    subscription = subscriptions[1]
-    expect(subscription.klass).to eq(SubscribeBackgroundHandler)
-    expect(subscription.topic).to eq("com.example.topic1_back")
+    expect{
+      session.publish("topic", nil, nil)
 
-    subscription = subscriptions[2]
-    expect(subscription.klass).to eq(SubscribeHandler)
-    expect(subscription.topic).to eq("com.example.topic2")
+      session.publish("other.topic", nil, nil)
 
-    expect(config.registrations.count).to eq(2)
-    expect(config.registrations(:other).count).to eq(4)
+      session.call("return_error", nil, nil) do |result, error, details|
+        expect(error).to eq("error")
+      end
 
-    registrations = config.registrations(:other)
+      session.call("throw_error", nil, nil) do |result, error, details|
+        expect(error).to eq("error")
+      end
 
-    registration = registrations[0]
-    expect(registration.klass).to eq(RegisterHandler)
-    expect(registration.procedure).to eq("com.example.procedure1")
+      session.call("throw_exception", nil, nil) do |result, error, details|
+        expect(error).to eq("error")
+      end
 
-    registration = registrations[1]
-    expect(registration.klass).to eq(RegisterBackgroundHandler)
-    expect(registration.procedure).to eq("com.example.procedure1_back")
+      session.call("call_result", [3], nil) do |result, error, details|
+        expect(result[:args][0]).to eq(5)
+      end
 
-    registration = registrations[2]
-    expect(registration.klass).to eq(RegisterHandler)
-    expect(registration.procedure).to eq("com.example.procedure2")
+      session.call("other.call_result", [3], nil) do |result, error, details|
+        expect(result[:args][0]).to eq(5)
+      end
 
-    registration = registrations[3]
-    expect(registration.klass).to eq(RegisterBackgroundHandler)
-    expect(registration.procedure).to eq("com.example.procedure2_back")
+      session.call("normal_result", [3], nil) do |result, error, details|
+        expect(result[:args][0]).to eq(6)
+      end
+
+      session.call("nil_result", [3], nil) do |result, error, details|
+        expect(result[:args][0]).to eq(nil)
+      end
+
+      session.call("proxy_result", [3], nil) do |result, error, details|
+        expect(result[:args][0]).to eq(6)
+      end
+    }.to change{ NormalHandler.run_count }.by(11)
+
+  end
+
+  it "executes the background handlers" do
+    Wamp::Worker.subscribe_topics(name, proxy, session)
+    Wamp::Worker.register_procedures(name, proxy, session)
+
+    queue_count = 0
+    queue_params = nil
+
+    allow_any_instance_of(Wamp::Worker::Redis::Queue).to receive(:push_background) do |queue, command, handle, params|
+      queue_count += 1
+      queue_params = params
+      expect(command).to eq(:yield)
+    end
+
+    expect{
+      session.publish("back.topic", nil, nil)
+
+      session.publish("back.other.topic", nil, nil)
+
+      session.call("back.return_error", nil, nil)
+      expect(queue_params[:error][:error]).to eq("error")
+
+      session.call("back.throw_error", nil, nil)
+      expect(queue_params[:error][:error]).to eq("error")
+
+      session.call("back.throw_exception", nil, nil)
+      expect(queue_params[:error][:error]).to eq("wamp.error.runtime")
+
+      session.call("back.call_result", [3], nil)
+      expect(queue_params[:result][:args][0]).to eq(5)
+
+      session.call("back.other.call_result", [3], nil)
+      expect(queue_params[:result][:args][0]).to eq(5)
+
+      session.call("back.normal_result", [3], nil)
+      expect(queue_params[:result][:args][0]).to eq(6)
+
+      session.call("back.nil_result", [3], nil)
+      expect(queue_params[:result]).to eq({})
+    }.to change{ BackgroundHandler.run_count }.by(9)
+
+    expect(queue_count).to eq(7)
   end
 
 end

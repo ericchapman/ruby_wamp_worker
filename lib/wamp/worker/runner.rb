@@ -67,21 +67,11 @@ module Wamp
         # Set the session
         self.proxy.session = session
 
-        # Subscribe to the topics
-        Wamp::Worker.config.subscriptions(self.name).each do |s|
-          handler = -> a, k, d {
-            s.klass.create(self.proxy, :subscription, a, k, d).invoke
-          }
-          session.subscribe(s.topic, handler, s.options)
-        end
-
         # Register for the procedures
-        Wamp::Worker.config.registrations(self.name).each do |r|
-          handler = -> a,k,d  {
-            r.klass.create(self.proxy, :procedure, a, k, d).invoke
-          }
-          session.register(r.procedure, handler, r.options)
-        end
+        Wamp::Worker.register_procedures(self.name, self.proxy, session)
+
+        # Subscribe to the topics
+        Wamp::Worker.subscribe_topics(self.name, self.proxy, session)
       end
 
       def leave_handler(reason, details)
