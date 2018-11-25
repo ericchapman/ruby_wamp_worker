@@ -59,18 +59,6 @@ describe Wamp::Worker::Runner do
       runner.proxy.session.publish @topic
     }.to change{ SubscribeHandler.run_count }.by(1)
 
-    allow_any_instance_of(SessionStub).to receive(:yield) do |session, request, result, options, check_defer|
-      expect(result.args[0]).to eq(5)
-    end
-
-    expect {
-      runner.proxy.session.call @procedure+@back, [3] do |result, error, details|
-        expect(result[:args][0].is_a?(Wamp::Client::Defer::CallDefer)).to eq(true)
-      end
-
-      runner.tick_handler
-    }.to change{ RegisterBackgroundHandler.run_count }.by(1)
-
     expect {
       runner.proxy.session.publish @topic+@back
       runner.tick_handler
@@ -82,6 +70,70 @@ describe Wamp::Worker::Runner do
     # Check attributes
     expect(runner.active?).to eq(false)
     expect(runner.proxy.session).to be_nil
+  end
+
+  context "background" do
+    let(:runner) { described_class.new :test, client: ClientStub.new({}) }
+    before(:each) { runner.start }
+
+    def make_call(args, kwargs, &callback)
+      allow_any_instance_of(SessionStub).to receive(:yield) do |session, request, result, options, check_defer|
+        callback.call(result)
+      end
+
+      runner.proxy.session.call @procedure+@back, args, kwargs do |result, error, details|
+        expect(result[:args][0].is_a?(Wamp::Client::Defer::CallDefer)).to eq(true)
+      end
+
+      runner.tick_handler
+    end
+
+    it "handles an error result response" do
+      expect {
+        make_call([3],{call_error: true}) do |result|
+          expect(result.error).to eq("error")
+        end
+      }.to change{ RegisterBackgroundHandler.run_count }.by(1)
+    end
+
+    it "handles an error result response" do
+      expect {
+        make_call([3],{error: true}) do |result|
+          expect(result.error).to eq("wamp.error.runtime")
+        end
+      }.to change{ RegisterBackgroundHandler.run_count }.by(1)
+    end
+
+    it "handles a normal result response" do
+      expect {
+        make_call([3],{normal_result: true}) do |result|
+          expect(result.args[0]).to eq(6)
+        end
+      }.to change{ RegisterBackgroundHandler.run_count }.by(1)
+    end
+
+    it "handles a call result response" do
+      expect {
+        make_call([3],{call_result: true}) do |result|
+          expect(result.args[0]).to eq(5)
+        end
+      }.to change{ RegisterBackgroundHandler.run_count }.by(1)
+    end
+
+    it "handles a nil result response" do
+      expect {
+        make_call([3],{}) do |result|
+          expect(result.args.count).to eq(0)
+        end
+      }.to change{ RegisterBackgroundHandler.run_count }.by(1)
+    end
+
+  end
+
+  context "call" do
+    it "can call another task from a handler" do
+
+    end
   end
 
   context "challenge" do

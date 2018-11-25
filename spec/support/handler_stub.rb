@@ -68,11 +68,18 @@ class RegisterBackgroundHandler < Wamp::Worker::BackgroundHandler
   def handler
     self.class.increment_run_count
 
-    if kwargs[:error]
+    if kwargs['call_error']
       raise Wamp::Client::CallError.new("error")
+    elsif kwargs['error']
+      raise Exception.new("error")
+    elsif kwargs['call_result']
+      Wamp::Client::CallResult.new([(self.args[0] + 2)])
+    elsif kwargs['normal_result']
+      self.args[0] + 3
+    else
+      nil
     end
 
-    Wamp::Client::CallResult.new([(self.args[0] + 2)])
   end
 end
 

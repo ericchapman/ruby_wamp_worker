@@ -98,11 +98,11 @@ module Wamp
         # Call the user code and make sure to catch exceptions
         begin
           result = self.handler
-        rescue => e
+        rescue Exception => e
           if e.is_a? Wamp::Client::CallError
             result = e
           else
-            result = CallError.new('wamp.error.runtime', [e.to_s])
+            result = Wamp::Client::CallError.new('wamp.error.runtime', [e.to_s])
           end
         end
 
