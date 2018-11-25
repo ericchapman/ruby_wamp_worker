@@ -108,8 +108,7 @@ module Wamp
       def perform(name, method, handle, command, args, kwargs, details)
 
         # Create a proxy to act like the session
-        redis = Wamp::Worker.config.redis(name)
-        proxy = Wamp::Worker::Proxy::Requestor.new(redis, name)
+        proxy = Wamp::Worker.requestor(name)
 
         # Deserialize the arguments as symbols
         args = JSON.parse(args, :symbolize_names => true)
@@ -122,12 +121,10 @@ module Wamp
         # Call the user code and make sure to catch exceptions
         begin
           result = self.send(method)
-        rescue Exception => e
-          if e.is_a? Wamp::Client::CallError
-            result = e
-          else
-            result = Wamp::Client::CallError.new('wamp.error.runtime', [e.to_s])
-          end
+        rescue Wamp::Client::CallError => e
+          result = e
+        rescue StandardError => e
+          result = Wamp::Client::CallError.new('wamp.error.runtime', [e.to_s])
         end
 
         # Only return the response if it is a procedure
@@ -158,6 +155,10 @@ module Wamp
       def invoke(method)
 
         # Schedule the task with Redis
+        #
+        # Note: We are explicitly serializing the args, kwargs, details
+        # so that we can deserialize and have them appear as symbols in
+        # the handler
         self.class.perform_async(
             self.proxy.name,
             method,

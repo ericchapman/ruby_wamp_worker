@@ -1,17 +1,9 @@
+require_relative "error"
 require "json"
 
 module Wamp
   module Worker
     module Redis
-
-      class ValueAlreadyRead < RuntimeError
-      end
-
-      class WorkerNotResponding < RuntimeError
-      end
-
-      class ResponseTimeout < RuntimeError
-      end
 
       # This class represents the payload that will be stored in Redis
       class Descriptor
@@ -195,7 +187,7 @@ module Wamp
 
               # If the response is "false", raise an exception signalling it was already read
               unless response
-                raise ValueAlreadyRead.new("Value was already retrieved")
+                raise Wamp::Worker::Error::ValueAlreadyRead.new("Value was already retrieved")
               end
 
               # Set the handle to "false" signalling that the response has already been fetched.
@@ -206,7 +198,7 @@ module Wamp
             elsif current_time >= (start_time + self.timeout)
 
               # If we surpassed the overall timeout, trigger error
-              raise ResponseTimeout.new("no response received after #{self.timeout} seconds")
+              raise Wamp::Worker::Error::ResponseTimeout.new("no response received after #{self.timeout} seconds")
 
             elsif new_tick == old_tick
 
@@ -223,7 +215,7 @@ module Wamp
 
           # If a timeout was reached, throw the exception
           if idle_count >= IDLE_TIMEOUT
-            raise WorkerNotResponding.new("Worker '#{self.name}' is not responding")
+            raise Wamp::Worker::Error::WorkerNotResponding.new("Worker '#{self.name}' is not responding")
           end
 
           # Return the parsed descriptor

@@ -1,5 +1,6 @@
 require "wamp/client/connection"
 require_relative "handler"
+require_relative "error"
 
 module Wamp
   module Worker
@@ -86,7 +87,7 @@ module Wamp
         if challenge
           challenge.call(authmethod, extra)
         else
-          raise RuntimeError, "client asked for '#{authmethod}' challenge, but no ':challenge' option was provided"
+          raise Error::ChallengeMissing.new("client asked for '#{authmethod}' challenge, but no ':challenge' option was provided")
         end
       end
 

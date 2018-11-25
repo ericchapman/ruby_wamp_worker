@@ -16,7 +16,7 @@ class Handler
 
   def throw_exception
     self.class.increment_run_count
-    raise Exception.new("error")
+    raise StandardError.new("error")
   end
 
   def call_result

@@ -82,7 +82,7 @@ describe Wamp::Worker::Runner do
       # Errors because the callback wasn't defined
       expect {
         runner.start
-      }.to raise_error(RuntimeError)
+      }.to raise_error(Wamp::Worker::Error::ChallengeMissing)
     end
 
     it "does not error when the challenge is defined" do

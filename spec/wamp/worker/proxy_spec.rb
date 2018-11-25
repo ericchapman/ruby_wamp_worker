@@ -65,7 +65,7 @@ describe Wamp::Worker::Proxy do
 
       expect {
         requestor.queue.pop_response(handle)
-      }.to raise_error(Wamp::Worker::Redis::WorkerNotResponding)
+      }.to raise_error(Wamp::Worker::Error::WorkerNotResponding)
     end
 
     it "parses call command" do

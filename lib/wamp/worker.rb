@@ -4,6 +4,7 @@ require "wamp/worker/redis"
 require "wamp/worker/handler"
 require "wamp/worker/runner"
 require "wamp/worker/config"
+require "wamp/worker/error"
 require "redis"
 
 module Wamp
@@ -32,10 +33,10 @@ module Wamp
 
       # Get the connection info
       connection = self.config.connections[name]
-      raise RuntimeError.new("no configuration found for connection '#{name}'") unless connection
+      raise Error::UndefinedConfiguration.new("no configuration found for connection '#{name}'") unless connection
 
       # Create the runner and start it
-      runner = Runner.new(name, self.config.redis, **(options.merge(connection)))
+      runner = Runner.new(name, self.config.redis(name), **(options.merge(connection)))
       runner.start
 
     end
@@ -45,7 +46,7 @@ module Wamp
     # @param name [Symbol] - The name of the connection
     # @return [Wamp::Worker::Proxy::Requestor] - An object that can be used to make requests
     def self.requestor(name)
-      Proxy::Requestor.new(self.config.redis, name)
+      Proxy::Requestor.new(self.config.redis(name), name)
     end
 
     # Registers procedures

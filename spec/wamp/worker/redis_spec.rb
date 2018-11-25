@@ -29,7 +29,7 @@ describe Wamp::Worker::Redis do
     # Raises and error because there was not response
     expect {
       queue.pop_response(handle)
-    }.to raise_error(described_class::ValueAlreadyRead)
+    }.to raise_error(Wamp::Worker::Error::ValueAlreadyRead)
   end
 
   it "round trip background" do
@@ -55,7 +55,7 @@ describe Wamp::Worker::Redis do
     # Raises and error because there was not response
     expect {
       queue.pop_response(handle)
-    }.to raise_error(described_class::WorkerNotResponding)
+    }.to raise_error(Wamp::Worker::Error::WorkerNotResponding)
   end
 
   it "timeout with no response" do
@@ -72,7 +72,7 @@ describe Wamp::Worker::Redis do
     # Raises and error because there was not response
     expect {
       queue.pop_response(handle)
-    }.to raise_error(described_class::ResponseTimeout)
+    }.to raise_error(Wamp::Worker::Error::ResponseTimeout)
 
     Wamp::Worker.config[:default][:timeout] = old_timeout
   end

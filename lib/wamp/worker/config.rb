@@ -1,4 +1,5 @@
 require "redis"
+require_relative "error"
 
 module Wamp
   module Worker
@@ -12,7 +13,9 @@ module Wamp
         @method = method
         @options = options
 
-        raise TypeError.new("'klass' must be a Wamp::Worker::Handler type") unless klass.ancestors.include? BaseHandler
+        unless klass.ancestors.include? BaseHandler
+          raise Error::HandleTypeError.new("'klass' must be a Wamp::Worker::Handler type")
+        end
       end
     end
 
