@@ -1,3 +1,4 @@
+require_relative "proxy/backgrounder"
 require 'sidekiq'
 require 'wamp/client/defer'
 require 'json'
@@ -105,47 +106,49 @@ module Wamp
       # @param args [Array] - The arguments for the handler
       # @param kwargs [Hash] - The keyword arguments for the handler
       # @param details [Hash] - Other details about the call
-      def perform(name, method, handle, command, args, kwargs, details)
+      def perform(method, proxy_name, proxy_handle, command, args, kwargs, details)
 
-        # Create a proxy to act like the session
-        proxy = Wamp::Worker.requestor(name)
+        # Create a proxy to act like the session.  Use a backgrounder so we also
+        # get the "yield" method
+        proxy = Proxy::Backgrounder.new(proxy_name, proxy_handle)
 
         # Deserialize the arguments as symbols
         args = JSON.parse(args, :symbolize_names => true)
         kwargs = JSON.parse(kwargs, :symbolize_names => true)
         details = JSON.parse(details, :symbolize_names => true)
 
+        # Get the st ID
+        request = details[:request]
+
         # Configure the handler
         self.configure(proxy, command, args, kwargs, details)
 
         # Call the user code and make sure to catch exceptions
         begin
-          result = self.send(method)
+          response = self.send(method)
         rescue Wamp::Client::CallError => e
-          result = e
+          response = e
         rescue StandardError => e
-          result = Wamp::Client::CallError.new('wamp.error.runtime', [e.to_s])
+          response= Wamp::Client::CallError.new('wamp.error.runtime', [e.to_s])
         end
 
         # Only return the response if it is a procedure
         if command.to_sym == :procedure
 
-          # Initialize the return parameters
-          params = { request: details[:request], options: {}, check_defer: true }
-
           # Manipulate the result to be serialized
-          if result == nil
-            params[:result] = {}
-          elsif result.is_a?(Wamp::Client::CallResult)
-            params[:result] = { args: result.args, kwargs: result.kwargs }
-          elsif result.is_a?(Wamp::Client::CallError)
-            params[:error] = { error: result.error, args: result.args, kwargs: result.kwargs }
-          else
-            params[:result] = { args: [result] }
-          end
+          result =
+              if response == nil
+                { result: {} }
+              elsif response.is_a?(Wamp::Client::CallResult)
+                { result: { args: response.args, kwargs: response.kwargs }}
+              elsif response.is_a?(Wamp::Client::CallError)
+                { error: { error: response.error, args: response.args, kwargs: response.kwargs } }
+              else
+                { result: { args: [response] } }
+              end
 
           # Send the data back to the
-          proxy.queue.push_background :yield, handle, params
+          proxy.yield request, result, {}, true
 
         end
       end
@@ -160,9 +163,9 @@ module Wamp
         # so that we can deserialize and have them appear as symbols in
         # the handler
         self.class.perform_async(
-            self.proxy.name,
             method,
-            self.proxy.queue.get_background_key,
+            self.proxy.name,
+            self.proxy.background_res_queue,
             self.command,
             self.args.to_json,
             self.kwargs.to_json,

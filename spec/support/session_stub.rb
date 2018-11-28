@@ -31,12 +31,10 @@ class SessionStub
     if registration
       begin
         result = registration.call(args, kwargs, {request: request})
-      rescue Exception => e
-        if e.is_a? Wamp::Client::CallError
-          result = e
-        else
-          result = Wamp::Client::CallError.new("error")
-        end
+      rescue Wamp::Client::CallError => e
+        result = e
+      rescue StandardError
+        result = Wamp::Client::CallError.new("error")
       end
 
       if result.nil?
@@ -44,7 +42,7 @@ class SessionStub
       elsif result.is_a?(Wamp::Client::Defer::CallDefer)
         # Do nothing
       elsif result.is_a?(Wamp::Client::CallError)
-        error = result.error
+        error = { error: result.error, args: result.args, kwargs: result.kwargs }
         result = nil
       elsif not result.is_a?(Wamp::Client::CallResult)
         result = Wamp::Client::CallResult.new([result])

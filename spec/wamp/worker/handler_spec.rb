@@ -3,13 +3,7 @@ require "spec_helper"
 describe Wamp::Worker::Handler do
   let(:name) { :other }
   let(:session) { SessionStub.new }
-  let(:redis) { Wamp::Worker.config.redis(name) }
-  let(:proxy) {
-    proxy = Wamp::Worker::Proxy::Dispatcher.new(redis, name)
-    proxy.session = session
-    proxy
-  }
-  before(:each) { stub_redis }
+  let(:proxy) { Wamp::Worker::Proxy::Dispatcher.new(name, session) }
 
   it "registers the handlers" do
     config = Wamp::Worker.config
@@ -31,15 +25,15 @@ describe Wamp::Worker::Handler do
       session.publish("other.topic", nil, nil)
 
       session.call("return_error", nil, nil) do |result, error, details|
-        expect(error).to eq("error")
+        expect(error[:error]).to eq("error")
       end
 
       session.call("throw_error", nil, nil) do |result, error, details|
-        expect(error).to eq("error")
+        expect(error[:error]).to eq("error")
       end
 
       session.call("throw_exception", nil, nil) do |result, error, details|
-        expect(error).to eq("error")
+        expect(error[:error]).to eq("error")
       end
 
       session.call("call_result", [3], nil) do |result, error, details|
@@ -72,9 +66,9 @@ describe Wamp::Worker::Handler do
     queue_count = 0
     queue_params = nil
 
-    allow_any_instance_of(Wamp::Worker::Redis::Queue).to receive(:push_background) do |queue, command, handle, params|
+    allow_any_instance_of(Wamp::Worker::Queue).to receive(:push) do |queue, queue_name, command, params, handle|
+      queue_params = params[:result]
       queue_count += 1
-      queue_params = params
       expect(command).to eq(:yield)
     end
 

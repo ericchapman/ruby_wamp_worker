@@ -17,8 +17,7 @@ module Wamp
         @verbose = self.options[:verbose]
 
         # Create the dispatcher proxy
-        redis = Wamp::Worker.config.redis(self.name)
-        @proxy = Proxy::Dispatcher.new(redis, self.name)
+        @proxy = Proxy::Dispatcher.new(self.name)
 
         # Add the tick loop handler
         self.client.transport_class.add_tick_loop { self.tick_handler }
@@ -92,7 +91,7 @@ module Wamp
       end
 
       def tick_handler
-        self.proxy.process_requests
+        self.proxy.check_requests
       end
 
     end

@@ -1,6 +1,9 @@
 require "wamp/worker/version"
-require "wamp/worker/proxy"
-require "wamp/worker/redis"
+require "wamp/worker/proxy/requestor"
+require "wamp/worker/proxy/dispatcher"
+require "wamp/worker/proxy/backgrounder"
+require "wamp/worker/queue"
+require "wamp/worker/ticker"
 require "wamp/worker/handler"
 require "wamp/worker/runner"
 require "wamp/worker/config"
@@ -36,7 +39,7 @@ module Wamp
       raise Error::UndefinedConfiguration.new("no configuration found for connection '#{name}'") unless connection
 
       # Create the runner and start it
-      runner = Runner.new(name, self.config.redis(name), **(options.merge(connection)))
+      runner = Runner.new(name, **(options.merge(connection)))
       runner.start
 
     end
@@ -46,7 +49,7 @@ module Wamp
     # @param name [Symbol] - The name of the connection
     # @return [Wamp::Worker::Proxy::Requestor] - An object that can be used to make requests
     def self.requestor(name)
-      Proxy::Requestor.new(self.config.redis(name), name)
+      Proxy::Requestor.new(name)
     end
 
     # Registers procedures

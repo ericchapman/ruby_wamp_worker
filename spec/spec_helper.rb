@@ -12,6 +12,9 @@ require 'sidekiq/testing'
 Sidekiq::Testing.inline!
 
 RSpec.configure do |config|
+  config.before(:each) {
+    stub_redis
+  }
 end
 
 def stub_redis

@@ -22,7 +22,7 @@ describe Wamp::Worker::Config do
 
     expect(config.connection).to eq({option: true})
     expect(config.timeout).to eq(100)
-    expect(config.redis.is_a?(::Redis)).to eq(true)
+    expect(config.redis.is_a?(RedisStub)).to eq(true)
     expect(config.registrations.count).to eq(1)
     expect(config.subscriptions.count).to eq(1)
   end
@@ -53,19 +53,19 @@ describe Wamp::Worker::Config do
 
     expect(config.connection).to eq({option: true, value: false})
     expect(config.timeout).to eq(100)
-    expect(config.redis.is_a?(::Redis)).to eq(true)
+    expect(config.redis.is_a?(RedisStub)).to eq(true)
     expect(config.registrations.count).to eq(1)
     expect(config.subscriptions.count).to eq(1)
 
     expect(config.connection(:other)).to eq({option: false, value: false})
     expect(config.timeout(:other)).to eq(200)
-    expect(config.redis(:other).is_a?(::Redis)).to eq(true)
+    expect(config.redis(:other).is_a?(RedisStub)).to eq(true)
     expect(config.registrations(:other).count).to eq(2)
     expect(config.subscriptions(:other).count).to eq(2)
 
     expect(config.connection(:another)).to eq({option: false, value: false})
     expect(config.timeout(:another)).to eq(300)
-    expect(config.redis(:another).is_a?(::Redis)).to eq(true)
+    expect(config.redis(:another).is_a?(RedisStub)).to eq(true)
     expect(config.registrations(:another).count).to eq(3)
     expect(config.subscriptions(:another).count).to eq(2)
   end

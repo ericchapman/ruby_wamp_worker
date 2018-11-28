@@ -32,6 +32,10 @@ class RedisStub
     (self.data[key] || []).pop
   end
 
+  def brpop(key, **args)
+    (self.data[key] || []).pop
+  end
+
   def incr(key)
     value = self.data[key] || 0
     value += 1

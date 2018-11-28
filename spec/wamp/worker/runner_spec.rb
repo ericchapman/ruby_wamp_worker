@@ -2,12 +2,6 @@ require "spec_helper"
 
 describe Wamp::Worker::Runner do
 
-  before(:each) {
-    # Override redis
-    redis = RedisStub.new
-    allow(::Redis).to receive(:new).and_return(redis)
-  }
-
   it "registers and subscribes" do
 
     # Create the runner
