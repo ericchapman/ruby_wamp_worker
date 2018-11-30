@@ -96,7 +96,7 @@ describe Wamp::Worker::Handler do
       expect(queue_params[:result][:args][0]).to eq(6)
 
       session.call("back.nil_result", [3], nil)
-      expect(queue_params[:result]).to eq({})
+      expect(queue_params[:result][:args][0]).to eq(nil)
     }.to change{ BackgroundHandler.run_count }.by(9)
 
     expect(queue_count).to eq(7)

@@ -85,20 +85,13 @@ module Wamp
             req_id = request.params[:request]
             options = request.params[:options]
             check_defer = request.params[:check_defer]
-            response = request.params[:result] || {}
+            result_hash = request.params[:result] || {}
 
             # Parse the results for data or error
-            result =
-                if response[:result] != nil
-                  temp = response[:result]
-                  Wamp::Client::CallResult.new(temp[:args], temp[:kwargs])
-                elsif response[:error]
-                  temp = response[:error]
-                  Wamp::Client::CallError.new(temp[:error], temp[:args], temp[:kwargs])
-                end
+            result = Response.from_hash(result_hash)
 
             # CAll the yield method
-            self.session.yield(req_id, result, options, check_defer)
+            self.session.yield(req_id, result.object, options, check_defer)
 
           else
 

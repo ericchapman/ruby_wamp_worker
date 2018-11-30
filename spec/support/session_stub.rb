@@ -25,10 +25,10 @@ class SessionStub
   def call(procedure, args=nil, kwargs=nil, options={}, &callback)
     registration = self.registrations[procedure]
     request = SecureRandom.uuid
-    result = nil
-    error = nil
 
     if registration
+
+      # Perform the API call
       begin
         result = registration.call(args, kwargs, {request: request})
       rescue Wamp::Client::CallError => e
@@ -37,27 +37,22 @@ class SessionStub
         result = Wamp::Client::CallError.new("error")
       end
 
-      if result.nil?
-        result = Wamp::Client::CallResult.new
-      elsif result.is_a?(Wamp::Client::Defer::CallDefer)
-        # Do nothing
-      elsif result.is_a?(Wamp::Client::CallError)
-        error = { error: result.error, args: result.args, kwargs: result.kwargs }
-        result = nil
-      elsif not result.is_a?(Wamp::Client::CallResult)
-        result = Wamp::Client::CallResult.new([result])
+      # Parse the response
+      unless result.is_a?(Wamp::Client::Defer::CallDefer)
+        response = Wamp::Worker::Proxy::Response.from_result(result)&.to_hash || {}
+        result = response[:result]
+        error = response[:error]
       end
     else
-      error = "no registration found"
+      result = nil
+      error = { error: "no registration found" }
     end
 
     if callback
       if result.is_a?(Wamp::Client::Defer::CallDefer)
         self.defers[request] = callback
-      elsif result
-        callback.call({args: result.args, kwargs: result.kwargs}, error, { procedure: procedure })
       else
-        callback.call(nil, error, { procedure: procedure })
+        callback.call(result, error, { procedure: procedure })
       end
     end
   end
@@ -80,20 +75,10 @@ class SessionStub
 
   def yield(request, result, options={}, check_defer=false)
     callback = self.defers.delete(request)
-    if callback
-      if result.nil?
-        result = Wamp::Client::CallResult.new
-      elsif result.is_a?(Wamp::Client::CallError)
-        # Do nothing
-      elsif not result.is_a?(Wamp::Client::CallResult)
-        result = Wamp::Client::CallResult.new([result])
-      end
 
-      if result.is_a?(Wamp::Client::CallError)
-        callback.call(nil, result.error, { request: request })
-      else
-        callback.call({ args: result.args, kwargs: result.kwargs }, nil, { request: request })
-      end
+    if callback
+      response = Wamp::Worker::Proxy::Response.from_result(result)&.to_hash || {}
+      callback.call(response[:result], response[:error], { request: request })
     end
 
   end

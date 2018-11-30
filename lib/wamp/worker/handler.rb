@@ -125,30 +125,21 @@ module Wamp
 
         # Call the user code and make sure to catch exceptions
         begin
-          response = self.send(method)
+          result = self.send(method)
         rescue Wamp::Client::CallError => e
-          response = e
+          result = e
         rescue StandardError => e
-          response= Wamp::Client::CallError.new('wamp.error.runtime', [e.to_s])
+          result = Wamp::Client::CallError.new('wamp.error.runtime', [e.to_s])
         end
 
         # Only return the response if it is a procedure
         if command.to_sym == :procedure
 
           # Manipulate the result to be serialized
-          result =
-              if response == nil
-                { result: {} }
-              elsif response.is_a?(Wamp::Client::CallResult)
-                { result: { args: response.args, kwargs: response.kwargs }}
-              elsif response.is_a?(Wamp::Client::CallError)
-                { error: { error: response.error, args: response.args, kwargs: response.kwargs } }
-              else
-                { result: { args: [response] } }
-              end
+          response = Wamp::Worker::Proxy::Response.from_result(result)&.to_hash || {}
 
           # Send the data back to the
-          proxy.yield request, result, {}, true
+          proxy.yield request, response, {}, true
 
         end
       end
