@@ -7,6 +7,10 @@ module Wamp
       class Dispatcher < Base
         attr_accessor :session
 
+        # We want to timeout every few seconds so higher level code can
+        # look for a shutdown
+        TIMEOUT = 2
+
         # Constructor
         #
         def initialize(name, session=nil)
@@ -14,40 +18,42 @@ module Wamp
           self.session = session
         end
 
-        # Processes the pending requests that are in the queue
+        # Increments the ticker
         #
-        def check_requests
-
-          # Increment the ticker
+        def increment_ticker
           self.ticker.increment(self.ticker_key)
+        end
+
+        # Check command queue
+        #
+        def check_command_queue
+          check_queue self.command_req_queue
+        end
+
+        # Check background queue
+        #
+        def check_background_queue
+          check_queue self.background_res_queue
+        end
+
+        private
+
+        # This methods blocks waiting for a value to appear in the queue
+        #
+        # @param queue_name [String] - the name of the queue
+        def check_queue(queue_name)
 
           # Exit if there is no session.  This will keep the items pending until
           # the session is re-established
           return unless self.session
 
-          # Create the pop loop
-          pop_loop = -> pop_method {
-            loop do
+          # Wait for a value to appear in the queue
+          descriptor = self.queue.pop(queue_name, wait: true, timeout: TIMEOUT)
 
-              # Get the next request
-              request = pop_method.call
+          # Execute the request if it exists
+          execute_request descriptor if descriptor
 
-              # Break if there are no more requests
-              break unless request
-
-              # Execute the request
-              execute_request request
-            end
-          }
-
-          # Check the normal requests
-          pop_loop.call -> { self.queue.pop(self.command_req_queue) }
-
-          # Check the background responses
-          pop_loop.call -> { self.queue.pop(self.background_res_queue) }
         end
-
-        private
 
         # Executes the request
         #

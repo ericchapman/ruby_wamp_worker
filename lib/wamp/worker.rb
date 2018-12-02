@@ -13,15 +13,24 @@ require "redis"
 module Wamp
   module Worker
 
-    # The global config object
-    CONFIG = Config.new
-
     # Returns the config object
     #
-    # @param name [Symbol] - The name of the connection
-    # @return [Config] - Returns the global config object
     def self.config
-      CONFIG
+      unless defined?(@config)
+        @config = Config.new
+      end
+      @config
+    end
+
+    # Returns the logger object
+    #
+    def self.logger
+      unless defined?(@logger)
+        @logger = Logger.new(STDOUT)
+        @logger.level = Logger::INFO
+        #@logger.formatter = ENV['DYNO'] ? WithoutTimestamp.new : Pretty.new
+      end
+      @logger
     end
 
     # Method to configure the worker

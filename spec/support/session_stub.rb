@@ -14,7 +14,7 @@ class SessionStub
     if subscription
       subscription.call(args, kwargs, {})
     else
-      error = "no subscriber found"
+      error = { error: "no subscriber found", args:[], kwargs:{} }
     end
 
     if callback and options[:acknowledge]
@@ -45,7 +45,7 @@ class SessionStub
       end
     else
       result = nil
-      error = { error: "no registration found" }
+      error = { error: "no registration found", args:[], kwargs:{} }
     end
 
     if callback

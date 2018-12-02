@@ -1,0 +1,53 @@
+#!/usr/bin/env ruby
+
+require "wamp/worker"
+require "optparse"
+
+config = nil
+name = nil
+verbose = false
+
+# Parse the options from the command line
+OptionParser.new do |opts|
+  opts.banner = "Usage: wamp-worker [options]"
+
+  opts.on("-v", "--[no-]verbose", "Run verbosely") do |v|
+    verbose = v
+  end
+
+  opts.on("-C", "--config CONFIG", "Configuration file") do |c|
+    config = c.strip
+  end
+
+  opts.on("-n", "--name NAME", "Worker name") do |n|
+    name = n.strip
+  end
+end.parse!
+
+# Load the config File
+if File.exist?(config)
+  puts "WAMP-WORKER: Loading config from #{config}"
+  eval(File.open(config, "r").read)
+else
+  raise Exception.new("no config file found/provided")
+end
+
+# Create the command thread which will block waiting for commands to come in
+#
+command_thread = Thread.new do
+
+end
+
+# Create the background thread that will block waiting for background responses
+#
+background_thread = Thread.new do
+
+end
+
+# Catch SIGINT
+Signal.trap('INT') { close }
+Signal.trap('TERM') { close }
+
+# Start the runner
+runner = Wamp::Worker::Runner.new(name: name, verbose: verbose)
+runner.start

@@ -7,16 +7,20 @@ module Wamp
 
     # This class is used to contain the run loop the executes on a worker
     class Runner
-      attr_reader :options, :client, :proxy, :name, :verbose
+      attr_reader :client, :proxy, :name, :challenge, :verbose
 
       # Constructor
-      def initialize(name, **options)
-        @options = options
-        @name = name
-        @client = self.options[:client] || Wamp::Client::Connection.new(self.options)
-        @verbose = self.options[:verbose]
+      def initialize(name=nil, **options)
+        @name = name&.to_sym || :default
 
-        # Create the dispatcher proxy
+        options = Wamp::Worker.config.connection(self.name).merge options
+
+        puts "WAMP: Starting runner with options #{options}"
+
+        # Setup different options
+        @verbose = options[:verbose]
+        @challenge = options[:challenge]
+        @client = options[:client] || Wamp::Client::Connection.new(options)
         @proxy = Proxy::Dispatcher.new(self.name)
 
         # Add the tick loop handler
@@ -82,16 +86,28 @@ module Wamp
       end
 
       def challenge_handler(authmethod, extra)
-        challenge = self.options[:challenge]
-        if challenge
-          challenge.call(authmethod, extra)
+        if self.challenge
+          self.challenge.call(authmethod, extra)
         else
           raise Error::ChallengeMissing.new("client asked for '#{authmethod}' challenge, but no ':challenge' option was provided")
         end
       end
 
       def tick_handler
+        current_time = Time.now.to_ms
+
+        # This logic makes sure we don't hit the redis server too often
+        return unless current_time > @next_tick
+
+        # Print a tick count to the screen
+        puts "WORKER tick #{@tick}" if self.verbose
+        @tick += 1
+
+        # Call the task
         self.proxy.check_requests
+
+        # Increment the counter
+        @next_tick = current_time + @tick_period
       end
 
     end

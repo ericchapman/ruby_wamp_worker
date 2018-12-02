@@ -38,4 +38,12 @@ describe Wamp::Worker::Queue do
     expect(queue.redis.exists(queue_name)).to eq(false)
   end
 
+  it "timeout" do
+    # Pop the descriptor
+    descriptor = queue.pop(queue_name, wait: true, timeout: 1)
+
+    # It should be nil
+    expect(descriptor).to eq(nil)
+  end
+
 end
