@@ -3,51 +3,39 @@
 require "wamp/worker"
 require "optparse"
 
-config = nil
-name = nil
-verbose = false
+options = {
+    :log_level => :info,
+}
 
 # Parse the options from the command line
 OptionParser.new do |opts|
   opts.banner = "Usage: wamp-worker [options]"
 
-  opts.on("-v", "--[no-]verbose", "Run verbosely") do |v|
-    verbose = v
+  opts.on("-l", "--log-level LEVEL", "Sets the logging level") do |l|
+    options[:log_level] = l.to_sym
   end
 
   opts.on("-C", "--config CONFIG", "Configuration file") do |c|
-    config = c.strip
+    options[:config] = c.strip
   end
 
   opts.on("-n", "--name NAME", "Worker name") do |n|
-    name = n.strip
+    options[:name] = n.strip
   end
 end.parse!
 
+# Set the logging level of the worker
+Wamp::Worker.log_level = options[:log_level]
+
 # Load the config File
+config = options[:config]
 if File.exist?(config)
-  puts "WAMP-WORKER: Loading config from #{config}"
+  Wamp::Worker.logger.info("Wamp::Worker loading config from '#{config}'")
   eval(File.open(config, "r").read)
 else
-  raise Exception.new("no config file found/provided")
+  raise Wamp::Worker::Error::NoConfigFile.new("no config file found/provided")
 end
-
-# Create the command thread which will block waiting for commands to come in
-#
-command_thread = Thread.new do
-
-end
-
-# Create the background thread that will block waiting for background responses
-#
-background_thread = Thread.new do
-
-end
-
-# Catch SIGINT
-Signal.trap('INT') { close }
-Signal.trap('TERM') { close }
 
 # Start the runner
-runner = Wamp::Worker::Runner.new(name: name, verbose: verbose)
+runner = Wamp::Worker.run(name, **options)
 runner.start

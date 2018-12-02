@@ -67,11 +67,11 @@ module Wamp
         # Constructor
         #
         # @param name [Symbol] - The name of the connection
-        def initialize(name)
+        def initialize(name, uuid: nil)
           @name = name
           @queue = Wamp::Worker::Queue.new(name)
           @ticker = Wamp::Worker::Ticker.new(name)
-          @uuid = ENV['DYNO'] || SecureRandom.hex(12)
+          @uuid = uuid || ENV['DYNO'] || SecureRandom.hex(12)
         end
 
         #region Command/Response

@@ -2,7 +2,7 @@ class ClientStub
   attr_accessor :session, :options, :is_open
 
   def transport_class
-    Wamp::Client::Transport::Base
+    Wamp::Client::Transport::EventMachineBase
   end
 
   def initialize(options)

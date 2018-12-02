@@ -1,77 +1,72 @@
 require "spec_helper"
 
 describe Wamp::Worker::Runner do
+  let(:name) { :other }
+  let(:runner) { described_class::Main.new(name) }
+  let(:requestor) { Wamp::Worker.requestor(name) }
 
-  it "registers and subscribes" do
+  def execute_runner
 
-    # Create the runner
-    runner = described_class.new :test, client: ClientStub.new({})
-
-    # Check attributes
-    expect(runner.active?).to eq(false)
-    expect(runner.proxy.session).to be_nil
-
-    # Start it
+    # Start the runner
     runner.start
 
-    # Check attributes
-    expect(runner.active?).to eq(true)
-    expect(runner.proxy.session).to be(runner.client.session)
+    # Start it and the event machine on a different thread
+    thread = Thread.new do
+      EM.run {}
+    end
 
-    # Check that some of the handlers work
-    expect{
-      runner.proxy.session.call("normal_result", [3], nil) do |result, error, details|
-        expect(result[:args][0]).to eq(6)
-      end
-    }.to change{ NormalHandler.run_count }.by(1)
+    yield
 
-    expect{
-      runner.proxy.session.call("call_result", [3], nil) do |result, error, details|
-        expect(result[:args][0]).to eq(5)
-      end
-    }.to change{ NormalHandler.run_count }.by(1)
+    # Stop the event machine
+    runner.client.transport_class.stop_event_machine
+    thread.join
 
     # Stop the runner
     runner.stop
 
-    # Check attributes
-    expect(runner.active?).to eq(false)
-    expect(runner.proxy.session).to be_nil
   end
 
-  context "background" do
-    let(:runner) { described_class.new :test, client: ClientStub.new({}) }
-    before(:each) { runner.start }
+  it "registers and subscribes" do
 
-    def make_call(procedure, args, kwargs, &callback)
-      runner.proxy.session.call procedure, args, kwargs do |result, error, details|
-        callback.call(result, error, details)
-      end
+    # Check attributes
+    expect(runner.active?).to eq(false)
+    expect(runner.dispatcher.session).to be_nil
 
-      runner.tick_handler
-    end
+    execute_runner do
 
-    it "handles a normal result" do
+      # Check attributes
+      expect(runner.active?).to eq(true)
+      expect(runner.dispatcher.session).to be(runner.client.session)
+
+      # Check that some of the handlers work
       expect{
-        make_call("back.normal_result", [3], nil) do |result, error, details|
+        requestor.call("normal_result", [3], nil) do |result, error, details|
           expect(result[:args][0]).to eq(6)
         end
-      }.to change{ BackgroundHandler.run_count }.by(1)
-    end
+      }.to change{ NormalHandler.run_count }.by(1)
 
-    it "handles a call result" do
       expect{
-        make_call("back.call_result", [3], nil) do |result, error, details|
+        requestor.call("back.call_result", [3], nil) do |result, error, details|
           expect(result[:args][0]).to eq(5)
         end
       }.to change{ BackgroundHandler.run_count }.by(1)
+
     end
 
+    # Check attributes
+    expect(runner.active?).to eq(false)
+    expect(runner.dispatcher.session).to be_nil
+  end
+
+  it "synchronizes the UUID between all of the runners" do
+    uuid = runner.dispatcher.uuid
+    expect(runner.command_monitor.dispatcher.uuid).to eq(uuid)
+    expect(runner.background_monitor.dispatcher.uuid).to eq(uuid)
   end
 
   context "challenge" do
     it "errors if challenge is called but no method was passed in" do
-      runner = described_class.new :test, client: ClientStub.new({should_challenge: true})
+      runner = described_class::Main.new :test, client: ClientStub.new({should_challenge: true})
 
       # Errors because the callback wasn't defined
       expect {
@@ -83,9 +78,9 @@ describe Wamp::Worker::Runner do
       value = 0
 
       # Create the runner passing it the challenge method
-      runner = described_class.new :test,
-                                   challenge: -> authmethod, details {value += 1},
-                                   client: ClientStub.new({should_challenge: true})
+      runner = described_class::Main.new :test,
+                                         challenge: -> authmethod, details {value += 1},
+                                         client: ClientStub.new({should_challenge: true})
 
       # Start the runner
       runner.start

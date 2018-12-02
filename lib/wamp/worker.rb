@@ -5,7 +5,7 @@ require "wamp/worker/proxy/backgrounder"
 require "wamp/worker/queue"
 require "wamp/worker/ticker"
 require "wamp/worker/handler"
-require "wamp/worker/runner"
+require "wamp/worker/runner/main"
 require "wamp/worker/config"
 require "wamp/worker/error"
 require "redis"
@@ -33,6 +33,26 @@ module Wamp
       @logger
     end
 
+    # Sets the log level
+    #
+    # @param log_level [Symbol] - the desired log level
+    def self.log_level=(log_level)
+      level =
+          case log_level
+          when :error
+            Logger::ERROR
+          when :debug
+            Logger::DEBUG
+          when :fatal
+            Logger::FATAL
+          when :warn
+            Logger::WARN
+          else
+            Logger::INFO
+          end
+      self.logger.level = level
+    end
+
     # Method to configure the worker
     #
     # @param name [Symbol] - The name of the connection
@@ -41,16 +61,15 @@ module Wamp
     end
 
     # Method to start a worker
-    def self.run(name, **options)
+    #
+    # @param name [Symbol] - The name of the connection
+    def self.run(name, **args)
 
       # Get the connection info
-      connection = self.config.connections[name]
-      raise Error::UndefinedConfiguration.new("no configuration found for connection '#{name}'") unless connection
+      options = Wamp::Worker.config.connection(name).merge(args)
 
       # Create the runner and start it
-      runner = Runner.new(name, **(options.merge(connection)))
-      runner.start
-
+      Runner::Main.new(name, **options).start
     end
 
     # Returns a requestor for objects to perform calls to the worker

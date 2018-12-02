@@ -22,7 +22,8 @@ describe Wamp::Worker::Proxy do
 
       # Create a thread to run the dispatcher
       thread = Thread.new do
-        dispatcher.check_command_queue
+        descriptor = dispatcher.check_command_queue
+        dispatcher.process(descriptor)
       end
 
       requestor.send(method, *args) do |result, error, details|
@@ -92,7 +93,10 @@ describe Wamp::Worker::Proxy do
 
     it "errors on unsupported proxy command" do
       requestor.queue.push requestor.command_req_queue, :bad, {}, "handle"
-      dispatcher.check_command_queue
+
+      descriptor = dispatcher.check_command_queue
+      dispatcher.process(descriptor)
+
       descriptor = requestor.queue.pop("handle")
       expect(descriptor.command).to eq(:bad)
       expect(descriptor.params[:error][:error]).to eq("unsupported proxy command 'bad'")
@@ -107,12 +111,14 @@ describe Wamp::Worker::Proxy do
 
       # Create a thread to run the dispatcher
       thread1 = Thread.new do
-        dispatcher.check_command_queue
+        descriptor = dispatcher.check_command_queue
+        dispatcher.process(descriptor)
       end
 
       if method == :call
         thread2 = Thread.new do
-          dispatcher.check_background_queue
+          descriptor = dispatcher.check_background_queue
+          dispatcher.process(descriptor)
         end
       else
         thread2 = nil

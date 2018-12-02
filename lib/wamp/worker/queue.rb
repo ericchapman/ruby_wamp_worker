@@ -113,8 +113,6 @@ module Wamp
       def log(type, queue_name, descriptor)
         return unless logger.level == Logger::DEBUG
 
-        logger.debug("")
-
         if descriptor
           logger.debug("#{self.class.name} #{type.upcase} : #{queue_name}")
           logger.debug("   command: #{descriptor.command}")

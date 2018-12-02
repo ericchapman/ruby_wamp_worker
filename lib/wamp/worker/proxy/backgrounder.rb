@@ -9,8 +9,8 @@ module Wamp
 
         # Constructor
         #
-        def initialize(name, handle)
-          super name
+        def initialize(name, handle, uuid: nil)
+          super name, uuid: uuid
           @handle = handle
         end
 

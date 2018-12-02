@@ -17,7 +17,10 @@ module Wamp
       class ChallengeMissing < RuntimeError
       end
 
-      class UndefinedConfiguration < RuntimeError
+      class NoSessionEstablished < RuntimeError
+      end
+
+      class NoConfigFile < RuntimeError
       end
 
     end

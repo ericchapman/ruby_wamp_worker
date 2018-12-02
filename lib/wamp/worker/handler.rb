@@ -110,7 +110,7 @@ module Wamp
 
         # Create a proxy to act like the session.  Use a backgrounder so we also
         # get the "yield" method
-        proxy = Proxy::Backgrounder.new(proxy_name, proxy_handle)
+        @proxy = Proxy::Backgrounder.new(proxy_name, proxy_handle)
 
         # Deserialize the arguments as symbols
         args = JSON.parse(args, :symbolize_names => true)
@@ -121,7 +121,7 @@ module Wamp
         request = details[:request]
 
         # Configure the handler
-        self.configure(proxy, command, args, kwargs, details)
+        self.configure(self.proxy, command, args, kwargs, details)
 
         # Call the user code and make sure to catch exceptions
         begin
@@ -139,7 +139,7 @@ module Wamp
           response = Wamp::Worker::Proxy::Response.from_result(result)&.to_hash || {}
 
           # Send the data back to the
-          proxy.yield request, response, {}, true
+          self.proxy.yield request, response, {}, true
 
         end
       end
