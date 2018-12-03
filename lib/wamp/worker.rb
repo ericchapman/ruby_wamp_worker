@@ -8,6 +8,7 @@ require "wamp/worker/handler"
 require "wamp/worker/runner/main"
 require "wamp/worker/config"
 require "wamp/worker/error"
+require "wamp/client"
 require "redis"
 
 module Wamp
@@ -37,6 +38,7 @@ module Wamp
     #
     # @param log_level [Symbol] - the desired log level
     def self.log_level=(log_level)
+      Wamp::Client.log_level = log_level
       level =
           case log_level
           when :error

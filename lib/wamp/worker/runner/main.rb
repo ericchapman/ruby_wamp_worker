@@ -109,6 +109,8 @@ module Wamp
         end
 
         def join_handler(session, details)
+          logger.info("#{self.class.name} runner '#{self.name}' joined session")
+
           # Set the session
           self.dispatcher.session = session
 
@@ -120,11 +122,15 @@ module Wamp
         end
 
         def leave_handler(reason, details)
+          logger.info("#{self.class.name} runner '#{self.name}' left session: #{reason}")
+
           # Clear the session
           self.dispatcher.session = nil
         end
 
         def challenge_handler(authmethod, extra)
+          logger.info("#{self.class.name} runner '#{self.name}' challenge")
+
           if self.challenge
             self.challenge.call(authmethod, extra)
           else
