@@ -1,9 +1,95 @@
+require "thread"
 require "wamp/client/connection"
-require_relative "background"
 
 module Wamp
   module Worker
     module Runner
+
+      # This is a base class for all of the runners
+      class Base
+        attr_reader :name, :dispatcher
+
+        # Constructor
+        #
+        # @param name [Symbol] - the name of the worker
+        def initialize(name, uuid: nil)
+          # Initialize the dispatcher
+          @name = name || :default
+          @dispatcher = Proxy::Dispatcher.new(self.name, uuid: uuid)
+
+          # Initialize the active logic
+          @active = false
+          @active_semaphore = Mutex.new
+        end
+
+        def active?
+          @active_semaphore.synchronize { @active }
+        end
+
+        # Starts the runner
+        #
+        def start
+          return if self.active?
+
+          @active_semaphore.synchronize { @active = true }
+        end
+
+        # Stops the runner
+        #
+        def stop
+          return unless self.active?
+
+          @active_semaphore.synchronize { @active = false }
+        end
+
+        # Returns the logger
+        #
+        def logger
+          Wamp::Worker.logger
+        end
+      end
+
+      # This class monitors the queue and returns the descriptor
+      class Background < Base
+        attr_reader :callback, :thread
+
+        # Constructor
+        #
+        # @param name [Symbol] - the name of the worker
+        def initialize(name, uuid: nil, &callback)
+          super name, uuid: uuid
+
+          @callback = callback
+
+          # Log the event
+          logger.info("#{self.class.name} '#{self.name}' created")
+        end
+
+        # Starts the runner
+        #
+        def start
+          return if self.active?
+          super
+
+          # Start the background thread
+          @thread = Thread.new do
+
+            # The background thread will infinitely call the callback while the
+            # runner is active
+            while self.active?
+              self.callback.call(self)
+            end
+            @thread = nil
+          end
+        end
+
+        # Stops the runner
+        #
+        def stop
+          return unless self.active?
+          super
+        end
+      end
 
       # This class is the main runner
       class Main < Base
@@ -109,7 +195,7 @@ module Wamp
         end
 
         def join_handler(session, details)
-          logger.info("#{self.class.name} runner '#{self.name}' joined session")
+          logger.info("#{self.class.name} runner '#{self.name}' joined session with realm '#{details[:realm]}'")
 
           # Set the session
           self.dispatcher.session = session
@@ -142,7 +228,8 @@ module Wamp
         #
         def tick_handler
 
-          # Check the ticket
+          # This code will implement the ticker every second.  This tells the
+          # requestors that the worker is alive
           current_time = Time.now.to_i
           if current_time > @last_tick
             self.dispatcher.increment_ticker
@@ -160,6 +247,7 @@ module Wamp
         end
 
       end
+
     end
   end
 end

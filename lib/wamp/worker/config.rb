@@ -3,6 +3,7 @@ require_relative "error"
 
 module Wamp
   module Worker
+    DEFAULT = :default
 
     #region Storage Objects
     class Handle
@@ -44,7 +45,7 @@ module Wamp
       attr_reader :name, :config
 
       def initialize(config, name=nil)
-        @name = name || :default
+        @name = name || DEFAULT
         @config = config
       end
 
@@ -90,22 +91,6 @@ module Wamp
         self[:registrations] = registrations
       end
 
-      # Allows the user to specify a name and configure accordingly
-      #
-      # @param name [Symbol] - The name for the connection
-      def namespace(name, &callback)
-        name ||= :default
-
-        # Create a new proxy and call it
-        proxy = ConfigProxy.new(self.config, name)
-
-        # Set the base class for the new namespace
-        proxy[:base] = self.name
-
-        # Execute the proxy methods
-        proxy.instance_eval(&callback)
-      end
-
       # Allows the user to configure without typing "config."
       #
       def configure(&callback)
@@ -141,40 +126,24 @@ module Wamp
       #
       # @param name [Symbol] - The name of the connection
       def connection(name=nil)
-        name ||= :default
-        connection = {}
-
-        self.parents(name, :connection) do |name, value|
-          connection = connection.merge(value || {})
-        end
-
-        connection
+        name ||= DEFAULT
+        self[name][:connection] || {}
       end
 
       # Returns the timeout value
       #
       # @param name [Symbol] - The name of the connection
       def timeout(name=nil)
-        name ||= :default
-        timeout = 60
-
-        self.parents(name, :timeout) do |name, value|
-          timeout = value if value
-        end
-
-        timeout
+        name ||= DEFAULT
+        self[name][:timeout] || 60
       end
 
       # Returns the redis value
       #
       # @param name [Symbol] - The name of the connection
       def redis(name=nil)
-        name ||= :default
-        redis = nil
-
-        self.parents(name, :redis) do |name, value|
-          redis = value if value
-        end
+        name ||= DEFAULT
+        redis = self[name][:redis]
 
         # If it is not a redis object, create one using it as the options
         if redis == nil
@@ -190,28 +159,16 @@ module Wamp
       #
       # @param name [Symbol] - The name of the connection
       def subscriptions(name=nil)
-        name ||= :default
-        subscriptions = []
-
-        self.parents(name, :subscriptions) do |name, value|
-          subscriptions += (value || [])
-        end
-
-        subscriptions
+        name ||= DEFAULT
+        self[name][:subscriptions] || []
       end
 
       # Returns the registrations
       #
       # @param name [Symbol] - The name of the connection
       def registrations(name=nil)
-        name ||= :default
-        registrations = []
-
-        self.parents(name, :registrations) do |name, value|
-          registrations += (value || [])
-        end
-
-        registrations
+        name ||= DEFAULT
+        self[name][:registrations] || []
       end
 
       # Returns the settings for a particular connection
@@ -221,25 +178,6 @@ module Wamp
         settings = self.settings[name] || {}
         self.settings[name] = settings
         settings
-      end
-
-      # Iterates through the base classes and fetches the value
-      #
-      def parents(name, attribute, &callback)
-        # If we got a nil name, return
-        return if name == nil
-
-        # Get the base class.  Set to :default if nil
-        base = self[name][:base]
-        if base == nil and name != :default
-          base = :default
-        end
-
-        # Execute the parent first
-        self.parents(base, attribute, &callback)
-
-        # Execute self
-        callback.call(name, self[name][attribute])
       end
     end
 

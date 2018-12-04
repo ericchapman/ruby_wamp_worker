@@ -1,41 +1,46 @@
 #!/usr/bin/env ruby
 
+require "wamp/worker/rails"
 require "wamp/worker"
 require "optparse"
+require 'fileutils'
 
 options = {
-    :log_level => :info,
+    :log_level => :debug,
+    :environment => "development",
+    :require => "./",
 }
 
 # Parse the options from the command line
 OptionParser.new do |opts|
   opts.banner = "Usage: wamp-worker [options]"
 
-  opts.on("-l", "--log-level LEVEL", "Sets the logging level") do |l|
-    options[:log_level] = l.to_sym
+  opts.on("-l", "--log-level LEVEL", "Sets the logging level") do |arg|
+    options[:log_level] = arg.to_sym
   end
 
-  opts.on("-C", "--config CONFIG", "Configuration file") do |c|
-    options[:config] = c.strip
+  opts.on("-n", "--name NAME", "Worker name") do |arg|
+    options[:name] = arg.strip.to_sym
   end
 
-  opts.on("-n", "--name NAME", "Worker name") do |n|
-    options[:name] = n.strip
+  opts.on '-r', '--require [PATH|DIR]', "Location of Rails application with workers or file to require" do |arg|
+    options[:require] = arg
+  end
+
+  opts.on '-e', '--environment ENV', "Application environment" do |arg|
+    options[:environment] = arg
   end
 end.parse!
 
 # Set the logging level of the worker
 Wamp::Worker.log_level = options[:log_level]
 
-# Load the config File
-config = options[:config]
-if File.exist?(config)
-  Wamp::Worker.logger.info("Wamp::Worker loading config from '#{config}'")
-  eval(File.open(config, "r").read)
-else
-  raise Wamp::Worker::Error::NoConfigFile.new("no config file found/provided")
-end
+# Load rails
+environment = options[:environment]
+Wamp::Worker.logger.info("Wamp::Worker using Rails environment '#{environment}'")
+
+Wamp::Worker::Rails.load_app(environment, options[:require])
 
 # Start the runner
-runner = Wamp::Worker.run(name, **options)
+runner = Wamp::Worker.run(options[:name], **options)
 runner.start

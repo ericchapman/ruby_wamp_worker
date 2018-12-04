@@ -40,14 +40,14 @@ describe Wamp::Worker::Runner do
 
       # Check that some of the handlers work
       expect{
-        requestor.call("normal_result", [3], nil) do |result, error, details|
-          expect(result[:args][0]).to eq(6)
+        requestor.call("other.call_result", [3], nil) do |result, error, details|
+          expect(result[:args][0]).to eq(5)
         end
       }.to change{ NormalHandler.run_count }.by(1)
 
       expect{
-        requestor.call("back.call_result", [3], nil) do |result, error, details|
-          expect(result[:args][0]).to eq(5)
+        requestor.call("back.other.call_result", [4], nil) do |result, error, details|
+          expect(result[:args][0]).to eq(6)
         end
       }.to change{ BackgroundHandler.run_count }.by(1)
 

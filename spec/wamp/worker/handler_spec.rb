@@ -1,7 +1,7 @@
 require "spec_helper"
 
 describe Wamp::Worker::Handler do
-  let(:name) { :other }
+  let(:name) { :default }
   let(:session) { SessionStub.new }
   let(:proxy) { Wamp::Worker::Proxy::Dispatcher.new(name, session) }
 
@@ -9,10 +9,12 @@ describe Wamp::Worker::Handler do
     config = Wamp::Worker.config
 
     expect(config.subscriptions.count).to eq(2)
-    expect(config.subscriptions(name).count).to eq(4)
+    expect(config.subscriptions(name).count).to eq(2)
+    expect(config.subscriptions(:other).count).to eq(2)
 
     expect(config.registrations.count).to eq(14)
-    expect(config.registrations(name).count).to eq(16)
+    expect(config.registrations(name).count).to eq(14)
+    expect(config.registrations(:other).count).to eq(2)
   end
 
   it "executes the normal handlers" do
@@ -21,8 +23,6 @@ describe Wamp::Worker::Handler do
 
     expect{
       session.publish("topic", nil, nil)
-
-      session.publish("other.topic", nil, nil)
 
       session.call("return_error", nil, nil) do |result, error, details|
         expect(error[:error]).to eq("error")
@@ -40,10 +40,6 @@ describe Wamp::Worker::Handler do
         expect(result[:args][0]).to eq(5)
       end
 
-      session.call("other.call_result", [3], nil) do |result, error, details|
-        expect(result[:args][0]).to eq(5)
-      end
-
       session.call("normal_result", [3], nil) do |result, error, details|
         expect(result[:args][0]).to eq(6)
       end
@@ -55,7 +51,7 @@ describe Wamp::Worker::Handler do
       session.call("proxy_result", [3], nil) do |result, error, details|
         expect(result[:args][0]).to eq(6)
       end
-    }.to change{ NormalHandler.run_count }.by(11)
+    }.to change{ NormalHandler.run_count }.by(9)
 
   end
 
@@ -75,8 +71,6 @@ describe Wamp::Worker::Handler do
     expect{
       session.publish("back.topic", nil, nil)
 
-      session.publish("back.other.topic", nil, nil)
-
       session.call("back.return_error", nil, nil)
       expect(queue_params[:error][:error]).to eq("error")
 
@@ -89,17 +83,14 @@ describe Wamp::Worker::Handler do
       session.call("back.call_result", [3], nil)
       expect(queue_params[:result][:args][0]).to eq(5)
 
-      session.call("back.other.call_result", [3], nil)
-      expect(queue_params[:result][:args][0]).to eq(5)
-
       session.call("back.normal_result", [3], nil)
       expect(queue_params[:result][:args][0]).to eq(6)
 
       session.call("back.nil_result", [3], nil)
       expect(queue_params[:result][:args][0]).to eq(nil)
-    }.to change{ BackgroundHandler.run_count }.by(9)
+    }.to change{ BackgroundHandler.run_count }.by(7)
 
-    expect(queue_count).to eq(7)
+    expect(queue_count).to eq(6)
   end
 
 end

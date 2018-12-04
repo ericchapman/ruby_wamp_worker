@@ -67,6 +67,8 @@ module Wamp
         # Constructor
         #
         # @param name [Symbol] - The name of the connection
+        # @param uuid [String] - The uuid for the proxy.  This can be passed in as
+        #                        well to allow it to be initialized for hte entire worker
         def initialize(name, uuid: nil)
           @name = name
           @queue = Wamp::Worker::Queue.new(name)

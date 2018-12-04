@@ -59,6 +59,7 @@ module Wamp
             args = descriptor.params[:args]
             kwargs = descriptor.params[:kwargs]
             options = descriptor.params[:options]
+
             self.session.call(procedure, args, kwargs, options, &callback)
 
           elsif descriptor.command == :publish
@@ -68,6 +69,7 @@ module Wamp
             args = descriptor.params[:args]
             kwargs = descriptor.params[:kwargs]
             options = descriptor.params[:options]
+
             self.session.publish(topic,  args, kwargs, options, &callback)
 
           elsif descriptor.command == :yield
@@ -77,11 +79,8 @@ module Wamp
             options = descriptor.params[:options]
             check_defer = descriptor.params[:check_defer]
             result_hash = descriptor.params[:result] || {}
-
-            # Parse the results for data or error
             result = Response.from_hash(result_hash)
 
-            # CAll the yield method
             self.session.yield(request, result.object, options, check_defer)
 
           else
@@ -104,7 +103,9 @@ module Wamp
         #
         # @param queue_name [String] - the name of the queue
         def check_queue(queue_name)
-          # Wait for a value to appear in the queue
+
+          # Wait for a value to appear in the queue.  We have a timeout so
+          # the thread can check if the worker has been killed
           self.queue.pop(queue_name, wait: true, timeout: TIMEOUT)
         end
 
