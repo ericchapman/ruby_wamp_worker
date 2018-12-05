@@ -16,30 +16,20 @@ module Wamp
           # Initialize the dispatcher
           @name = name || :default
           @dispatcher = Proxy::Dispatcher.new(self.name, uuid: uuid)
-
-          # Initialize the active logic
-          @active = false
-          @active_semaphore = Mutex.new
         end
 
         def active?
-          @active_semaphore.synchronize { @active }
+          false
         end
 
         # Starts the runner
         #
         def start
-          return if self.active?
-
-          @active_semaphore.synchronize { @active = true }
         end
 
         # Stops the runner
         #
         def stop
-          return unless self.active?
-
-          @active_semaphore.synchronize { @active = false }
         end
 
         # Returns the logger
@@ -60,16 +50,22 @@ module Wamp
           super name, uuid: uuid
 
           @callback = callback
+          @thread = nil
 
           # Log the event
           logger.info("#{self.class.name} '#{self.name}' created")
+        end
+
+        # Override "active"
+        #
+        def active?
+          @thread != nil
         end
 
         # Starts the runner
         #
         def start
           return if self.active?
-          super
 
           # Start the background thread
           @thread = Thread.new do
@@ -77,9 +73,13 @@ module Wamp
             # The background thread will infinitely call the callback while the
             # runner is active
             while self.active?
-              self.callback.call(self)
+              begin
+                self.callback.call(self)
+              rescue => e
+                logger.error("#{self.class.name} #{e.class.name} - #{e.message}")
+              end
             end
-            @thread = nil
+
           end
         end
 
@@ -87,7 +87,7 @@ module Wamp
         #
         def stop
           return unless self.active?
-          super
+          @thread = nil
         end
       end
 
@@ -107,6 +107,7 @@ module Wamp
           # Setup different options
           @challenge = options[:challenge]
           @client = options[:client] || Wamp::Client::Connection.new(options)
+          @active = false
 
           # Log the event
           logger.info("#{self.class.name} '#{self.name}' created with options")
@@ -144,11 +145,17 @@ module Wamp
           Signal.trap('TERM') { self.stop }
         end
 
+        # Override "active"
+        #
+        def active?
+          @active
+        end
+
         # Starts the run loop
         #
         def start
           return if self.active?
-          super
+          @active = true
 
           # On join, we need to subscribe and register the different handlers
           self.client.on :join do |session, details|
@@ -180,18 +187,14 @@ module Wamp
         #
         def stop
           return unless self.active?
-          super
+          @active = true
 
-          # Stop the monitors
+          # Stop the other threads
           self.command_monitor.stop
           self.background_monitor.stop
 
-          # Stop the even machine
+          # Stop the event machine
           self.client.close
-
-          # Synchronize waiting for thread to stop
-          self.command_monitor.thread&.join
-          self.background_monitor.thread&.join
         end
 
         def join_handler(session, details)

@@ -6,7 +6,7 @@ require "optparse"
 require 'fileutils'
 
 options = {
-    :log_level => :debug,
+    :log_level => :info,
     :environment => "development",
     :require => "./",
 }
@@ -16,7 +16,7 @@ OptionParser.new do |opts|
   opts.banner = "Usage: wamp-worker [options]"
 
   opts.on("-l", "--log-level LEVEL", "Sets the logging level") do |arg|
-    options[:log_level] = arg.to_sym
+    options[:log_level] = arg.strip.to_sym
   end
 
   opts.on("-n", "--name NAME", "Worker name") do |arg|
@@ -33,14 +33,14 @@ OptionParser.new do |opts|
 end.parse!
 
 # Set the logging level of the worker
-Wamp::Worker.log_level = options[:log_level]
+log_level = options[:log_level]
+Wamp::Worker.logger.info("Wamp::Worker using log level '#{log_level}'")
+Wamp::Worker.log_level = log_level
 
 # Load rails
 environment = options[:environment]
 Wamp::Worker.logger.info("Wamp::Worker using Rails environment '#{environment}'")
-
 Wamp::Worker::Rails.load_app(environment, options[:require])
 
 # Start the runner
-runner = Wamp::Worker.run(options[:name], **options)
-runner.start
+Wamp::Worker.run(options[:name], **options)
