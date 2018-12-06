@@ -1,5 +1,4 @@
 require_relative "proxy/backgrounder"
-require 'sidekiq'
 require 'wamp/client/defer'
 require 'json'
 
@@ -88,6 +87,9 @@ module Wamp
       def self.included(base)
         base.class_eval do
           include BaseHandler
+
+          # Use Sidekiq
+          require 'sidekiq'
           include ::Sidekiq::Worker
         end
       end

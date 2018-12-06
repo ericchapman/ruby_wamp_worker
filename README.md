@@ -1,8 +1,47 @@
 # Wamp::Worker
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/wamp/worker`. To experiment with that code, run `bin/console` for an interactive prompt.
+[![Gem Version](https://badge.fury.io/rb/wamp-worker.svg)](https://badge.fury.io/rb/wamp_client)
+[![Circle CI](https://circleci.com/gh/ericchapman/ruby_wamp_worker/tree/master.svg?&style=shield&circle-token=92813c17f9c9510c4c644e41683e7ba2572e0b2a)](https://circleci.com/gh/ericchapman/ruby_wamp_worker/tree/master)
+[![Codecov](https://img.shields.io/codecov/c/github/ericchapman/ruby_wamp_worker/master.svg)](https://codecov.io/github/ericchapman/ruby_wamp_worker)
 
-TODO: Delete this and the text above, and describe your gem
+Rails worker for talking to a WAMP Router.  This is defined [here](https://tools.ietf.org/html/draft-oberstet-hybi-tavendo-wamp-02)
+
+This is intended to replace [wamp_rails](https://github.com/ericchapman/ruby_wamp_rails).
+
+Also see [wamp_client](https://github.com/ericchapman/ruby_wamp_client).
+
+Wamp::Worker operates by using Redis to handle communication between your standard
+Rails instances and the main Wamp::Worker "runner".
+
+Wamp::Worker uses Wamp::Client to connect to a WAMP router.  Wamp::Client operates on top of 
+EventMachine.  One nuance of EventMachine is that if an operation is blocking, it will block
+handling of all incoming operations until it completes.  To remedy this, Wamp::Worker supports
+integration with a Sidekiq worker in your Rails application to push the operation to a background
+process.  This will allow Sidekiq to handle the operation while new requests come in.
+
+Wamp::Worker operates using 3 different threads
+
+ - The main thread is responsible for executing the Wamp::Client EventMachine operation which
+   will establish the connection to the router.  It also listens to the 2 other threads
+   looking for commands from Redis
+ - The command thread listens to Redis looking for call/publish requests from the
+   different Rails classes
+ - The background thread listens to Redis looking for responses from handlers that were
+   pushed to Sidekiq
+
+Some notes about Wamp::Worker
+
+ - intended to run as a Rails worker like 'Sidekiq'
+ - requires a Redis connection
+ - requires Sidekiq if background handlers are intended to be used
+ - supports WAMP call/publish from your standard Rails classes
+ - supports WAMP register/subscribe by including the "Handler" or "BackgroundHandler" modules
+   to classes you create
+   
+## Revision History
+
+ - v0.0.1:
+   - Initial Release
 
 ## Installation
 
@@ -22,20 +61,19 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+### Configuration
 
-## Development
+To configure Wamp::Worker, create a "config/initializers/wamp_worker.rb" file with the
+following options
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+``` ruby
+Wamp::Worker.configure do
+  connection uri: 'ws://127.0.0.1:8080/ws', realm: 'realm1'
+end
+```
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+Note that the "connection" value is passed directly to the "Wamp::Client" module.
 
-## Contributing
+### Connection
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/wamp-worker.
-
-
-## License
-
-The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
-
+### Handlers

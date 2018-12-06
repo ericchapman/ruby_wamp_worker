@@ -16,20 +16,7 @@ module Wamp
           # Initialize the dispatcher
           @name = name || :default
           @dispatcher = Proxy::Dispatcher.new(self.name, uuid: uuid)
-        end
-
-        def active?
-          false
-        end
-
-        # Starts the runner
-        #
-        def start
-        end
-
-        # Stops the runner
-        #
-        def stop
+          @active = false
         end
 
         # Returns the logger
@@ -37,6 +24,37 @@ module Wamp
         def logger
           Wamp::Worker.logger
         end
+
+        # Returns if the runner is active
+        #
+        def active?
+          @active
+        end
+
+        # Starts the runner
+        #
+        def start
+          return if self.active?
+          @active = true
+          self._start
+        end
+
+        # Stops the runner
+        #
+        def stop
+          return unless self.active?
+          self._stop
+          @active = false
+        end
+
+        #region Override Methods
+        def _start
+        end
+
+        def _stop
+        end
+        #endregion
+
       end
 
       # This class monitors the queue and returns the descriptor
@@ -50,25 +68,16 @@ module Wamp
           super name, uuid: uuid
 
           @callback = callback
-          @thread = nil
 
           # Log the event
-          logger.info("#{self.class.name} '#{self.name}' created")
-        end
-
-        # Override "active"
-        #
-        def active?
-          @thread != nil
+          logger.debug("#{self.class.name} '#{self.name}' created")
         end
 
         # Starts the runner
         #
-        def start
-          return if self.active?
-
+        def _start
           # Start the background thread
-          @thread = Thread.new do
+          Thread.new do
 
             # The background thread will infinitely call the callback while the
             # runner is active
@@ -81,13 +90,6 @@ module Wamp
             end
 
           end
-        end
-
-        # Stops the runner
-        #
-        def stop
-          return unless self.active?
-          @thread = nil
         end
       end
 
@@ -145,17 +147,9 @@ module Wamp
           Signal.trap('TERM') { self.stop }
         end
 
-        # Override "active"
-        #
-        def active?
-          @active
-        end
-
         # Starts the run loop
         #
-        def start
-          return if self.active?
-          @active = true
+        def _start
 
           # On join, we need to subscribe and register the different handlers
           self.client.on :join do |session, details|
@@ -185,9 +179,7 @@ module Wamp
 
         # Stops the run loop
         #
-        def stop
-          return unless self.active?
-          @active = true
+        def _stop
 
           # Stop the other threads
           self.command_monitor.stop
