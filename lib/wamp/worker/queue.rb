@@ -66,7 +66,7 @@ module Wamp
 
       # Pops a command off of the queue
       #
-      # @param queue_name [String] - The name of the queue
+      # @param queue_name [String, Array] - The name of the queue (or multiple queues if brpop)
       # @param wait [Bool] - True if we want to block waiting for the response
       # @param delete [Bool] - True if we want the queue deleted (only applicable if wait)
       # @param timeout [Int] - Number of seconds to wait before timing out
@@ -79,6 +79,12 @@ module Wamp
 
           # Make the pop call
           response = self.redis.brpop(queue_name, timeout: timeout)
+
+          # Returns [queue, value]
+          if response != nil
+            queue_name = response[0]
+            response = response[1]
+          end
         else
           # Else just call the method
           response = self.redis.rpop(queue_name)
@@ -89,14 +95,13 @@ module Wamp
           self.redis.delete(queue_name)
         end
 
-        # Log the info
-
         # Parse the response
         descriptor = response != nil ? Descriptor.from_json(response) : nil
 
         # Log the info
         log(:pop, queue_name, descriptor)
 
+        # Return the queue_name and the descriptor
         descriptor
       end
 

@@ -66,9 +66,9 @@ module Wamp
               # If the ticker never incremented, throw a "worker not responding" error
               current_tick = self.ticker.get(self.ticker_key)
               if start_tick == current_tick
-                raise Wamp::Worker::Error::WorkerNotResponding.new("worker '#{self.name}' is not responding")
+                raise(RuntimeError, "worker '#{self.name}' is not responding")
               else
-                raise Wamp::Worker::Error::ResponseTimeout.new("request to #{handle} timed out")
+                raise(RuntimeError, "request to #{handle} timed out")
               end
 
             else

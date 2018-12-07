@@ -1,5 +1,4 @@
 require_relative "base"
-require_relative "../error"
 
 module Wamp
   module Worker
@@ -25,16 +24,10 @@ module Wamp
           self.ticker.increment(self.ticker_key)
         end
 
-        # Check command queue
+        # Check the queues
         #
-        def check_command_queue
-          check_queue self.command_req_queue
-        end
-
-        # Check background queue
-        #
-        def check_background_queue
-          check_queue self.background_res_queue
+        def check_queues
+          check_queue [self.command_req_queue, self.background_res_queue]
         end
 
         # Executes the request
@@ -43,7 +36,7 @@ module Wamp
         def process(descriptor)
           return unless descriptor != nil
 
-          raise Error::NoSessionEstablished.new("Must have a session to process a descriptor") unless self.session != nil
+          raise(RuntimeError, "must have a session to process a descriptor") unless self.session != nil
 
           # Create the callback
           callback = -> result, error, details {

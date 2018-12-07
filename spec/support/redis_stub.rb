@@ -52,9 +52,19 @@ class RedisStub
     timeout = false
     start_time = Time.new.to_i
 
+    # BRPOP also supports an array of keys
+    keys = key.is_a?(Array) ? key : [key]
+    matched_key = nil
+
     while value == nil and not timeout
       self.semaphore.synchronize {
-        value = (self.data[key] || []).pop
+        keys.each do |temp_key|
+          value = (self.data[temp_key] || []).pop
+          if value != nil
+            matched_key = temp_key
+            break
+          end
+        end
       }
 
       if args[:timeout] != nil
@@ -65,7 +75,7 @@ class RedisStub
       end
     end
 
-    value
+    value != nil ? [matched_key, value] : nil
   end
 
   def incr(key)

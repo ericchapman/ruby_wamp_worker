@@ -122,6 +122,9 @@ module Wamp
         # Get the st ID
         request = details[:request]
 
+        # Add the proxy to the details as a "session"
+        details[:session] = self.proxy
+
         # Configure the handler
         self.configure(self.proxy, command, args, kwargs, details)
 
@@ -150,11 +153,14 @@ module Wamp
       #
       def invoke(method)
 
-        # Schedule the task with Redis
+        # Send the task to Sidekiq
         #
         # Note: We are explicitly serializing the args, kwargs, details
         # so that we can deserialize and have them appear as symbols in
-        # the handler
+        # the handler.  Also need to remove the session before serialization
+        details = self.details.clone
+        details.delete(:session)
+
         self.class.perform_async(
             method,
             self.proxy.name,
@@ -162,7 +168,7 @@ module Wamp
             self.command,
             self.args.to_json,
             self.kwargs.to_json,
-            self.details.to_json)
+            details.to_json)
 
         # If it is a procedure, return a defer
         if self.command == :procedure

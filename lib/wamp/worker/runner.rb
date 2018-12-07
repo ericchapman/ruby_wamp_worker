@@ -95,8 +95,7 @@ module Wamp
 
       # This class is the main runner
       class Main < Base
-        attr_reader :challenge, :client,
-                    :descriptor_queue, :command_monitor, :background_monitor
+        attr_reader :challenge, :client, :descriptor_queue, :queue_monitor
 
         # Constructor
         #
@@ -125,14 +124,8 @@ module Wamp
           uuid = self.dispatcher.uuid
 
           # Create a command queue monitor
-          @command_monitor = Background.new(self.name, uuid: uuid) do |runner|
-            descriptor = runner.dispatcher.check_command_queue
-            self.descriptor_queue.push(descriptor) if descriptor
-          end
-
-          # Create a background queue monitor
-          @background_monitor = Background.new(self.name, uuid: uuid) do |runner|
-            descriptor = runner.dispatcher.check_background_queue
+          @queue_monitor = Background.new(self.name, uuid: uuid) do |runner|
+            descriptor = runner.dispatcher.check_queues
             self.descriptor_queue.push(descriptor) if descriptor
           end
 
@@ -167,8 +160,7 @@ module Wamp
           end
 
           # Start the monitors
-          self.command_monitor.start
-          self.background_monitor.start
+          self.queue_monitor.start
 
           # Log info
           logger.info("#{self.class.name} '#{self.name}' started")
@@ -182,8 +174,7 @@ module Wamp
         def _stop
 
           # Stop the other threads
-          self.command_monitor.stop
-          self.background_monitor.stop
+          self.queue_monitor.stop
 
           # Stop the event machine
           self.client.close
@@ -215,7 +206,7 @@ module Wamp
           if self.challenge
             self.challenge.call(authmethod, extra)
           else
-            raise Error::ChallengeMissing.new("client asked for '#{authmethod}' challenge, but no ':challenge' option was provided")
+            raise(ArgumentError, "client asked for '#{authmethod}' challenge, but no ':challenge' option was provided")
           end
         end
 

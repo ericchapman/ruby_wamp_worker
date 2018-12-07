@@ -60,8 +60,15 @@ describe Wamp::Worker::Runner do
 
   it "synchronizes the UUID between all of the runners" do
     uuid = runner.dispatcher.uuid
-    expect(runner.command_monitor.dispatcher.uuid).to eq(uuid)
-    expect(runner.background_monitor.dispatcher.uuid).to eq(uuid)
+    expect(runner.queue_monitor.dispatcher.uuid).to eq(uuid)
+  end
+
+  it "increments the ticker" do
+    expect(runner.dispatcher.ticker.get(runner.dispatcher.ticker_key)).to eq(0)
+    execute_runner do
+      sleep(2)
+    end
+    expect(runner.dispatcher.ticker.get(runner.dispatcher.ticker_key)).to eq(2)
   end
 
   context "challenge" do
@@ -71,7 +78,7 @@ describe Wamp::Worker::Runner do
       # Errors because the callback wasn't defined
       expect {
         runner.start
-      }.to raise_error(Wamp::Worker::Error::ChallengeMissing)
+      }.to raise_error(ArgumentError)
     end
 
     it "does not error when the challenge is defined" do
