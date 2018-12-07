@@ -79,6 +79,9 @@ describe Wamp::Worker::Runner do
       expect {
         runner.start
       }.to raise_error(ArgumentError)
+
+      # Ensure that the runner terminated
+      expect(runner.active?).to eq(false)
     end
 
     it "does not error when the challenge is defined" do
@@ -92,8 +95,11 @@ describe Wamp::Worker::Runner do
       # Start the runner
       runner.start
 
-      # Expect that the challenge method was calle
+      # Expect that the challenge method was called
       expect(value).to eq(1)
+
+      # Stop the runner
+      runner.stop
     end
 
   end

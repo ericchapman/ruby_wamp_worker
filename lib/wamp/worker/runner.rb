@@ -73,7 +73,7 @@ module Wamp
           logger.debug("#{self.class.name} '#{self.name}' created")
         end
 
-        # Starts the runner
+        # Starts the background runner
         #
         def _start
           # Start the background thread
@@ -118,8 +118,8 @@ module Wamp
           # Create a queue for passing messages to the main runner
           @descriptor_queue = ::Queue.new
 
-          # Note: since all 3 of these monitors are attached to the same worker,
-          # we need to lock their UUIDs together.  This will make sure they
+          # Note: since the queue monitor is attached to the same worker,
+          # we need to lock the UUIDs together.  This will make sure they
           # delegate background tasks correctly
           uuid = self.dispatcher.uuid
 
@@ -206,6 +206,7 @@ module Wamp
           if self.challenge
             self.challenge.call(authmethod, extra)
           else
+            self.stop
             raise(ArgumentError, "client asked for '#{authmethod}' challenge, but no ':challenge' option was provided")
           end
         end

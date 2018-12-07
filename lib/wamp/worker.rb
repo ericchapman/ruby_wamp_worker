@@ -13,6 +13,16 @@ require "redis"
 module Wamp
   module Worker
 
+    # Used to include a requestor in a rails class
+    #
+    class Session
+      def self.new(name, method=:wamp_session)
+        Module.new do
+          define_method(method) { Wamp::Worker.requestor(name) }
+        end
+      end
+    end
+
     # Returns the config object
     #
     def self.config
@@ -29,7 +39,6 @@ module Wamp
         $stdout.sync = true unless ENV['RAILS_ENV'] == "production"
         @logger = Logger.new $stdout
         @logger.level = Logger::INFO
-        #@logger.formatter = ENV['DYNO'] ? WithoutTimestamp.new : Pretty.new
       end
       @logger
     end
