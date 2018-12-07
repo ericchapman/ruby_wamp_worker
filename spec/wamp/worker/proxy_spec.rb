@@ -2,7 +2,7 @@ require "spec_helper"
 require "thread"
 
 class RequestorClass
-  include Wamp::Worker::Session.new(:default)
+  include Wamp::Worker::Session.new(method: :temp_session)
 end
 
 describe Wamp::Worker::Proxy do
@@ -11,7 +11,7 @@ describe Wamp::Worker::Proxy do
   let(:procedure) { "procedure" }
   let(:session) { SessionStub.new }
   let(:dispatcher) { described_class::Dispatcher.new(name, session) }
-  let(:requestor) { RequestorClass.new.wamp_session }
+  let(:requestor) { RequestorClass.new.temp_session }
 
   before(:each) {
     Wamp::Worker.subscribe_topics(name, dispatcher, session)

@@ -34,7 +34,7 @@ class RedisStub
     }
   end
 
-  def delete(key)
+  def del(key)
     self.semaphore.synchronize {
       self.data.delete(key)
       1

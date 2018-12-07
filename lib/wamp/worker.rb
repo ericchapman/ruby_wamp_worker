@@ -16,7 +16,8 @@ module Wamp
     # Used to include a requestor in a rails class
     #
     class Session
-      def self.new(name, method=:wamp_session)
+      def self.new(name=nil, method: :wamp_session)
+        name ||= DEFAULT
         Module.new do
           define_method(method) { Wamp::Worker.requestor(name) }
         end

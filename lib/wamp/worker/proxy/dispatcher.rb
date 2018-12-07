@@ -40,7 +40,13 @@ module Wamp
 
           # Create the callback
           callback = -> result, error, details {
+            # Need to remove the session from the details response
+            details&.delete(:session)
+
+            # Create the params
             params = { result: result, error: error, details: details }
+
+            # Push the response back
             self.queue.push descriptor.handle, descriptor.command, params
           }
 
@@ -84,7 +90,7 @@ module Wamp
                 args: descriptor.params[:args],
                 kwargs: descriptor.params[:kwargs],
             }
-            callback.call(nil, error, nil)
+            callback.call(nil, error, {})
 
           end
 

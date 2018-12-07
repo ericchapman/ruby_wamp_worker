@@ -153,13 +153,15 @@ module Wamp
       #
       def invoke(method)
 
-        # Note: We are explicitly serializing the args, kwargs, details
-        # so that we can deserialize and have them appear as symbols in
-        # the handler.  Also need to remove the session before serialization
-        details = self.details.clone
-        details.delete(:session)
+        # Also need to remove the session since it is not serializable.
+        # Will add a new one in the background handler
+        self.details.delete(:session)
 
         # Send the task to Sidekiq
+        #
+        # Note: We are explicitly serializing the args, kwargs, details
+        # so that we can deserialize and have them appear as symbols in
+        # the handler.
         self.class.perform_async(
             method,
             self.proxy.name,

@@ -92,7 +92,7 @@ module Wamp
 
         # If delete was set, delete the queue
         if delete
-          self.redis.delete(queue_name)
+          self.redis.del(queue_name)
         end
 
         # Parse the response
