@@ -12,14 +12,18 @@ describe Wamp::Worker::Handler do
     expect(config.subscriptions(name).count).to eq(2)
     expect(config.subscriptions(:other).count).to eq(2)
 
-    expect(config.registrations.count).to eq(14)
-    expect(config.registrations(name).count).to eq(14)
+    expect(config.registrations.count).to eq(16)
+    expect(config.registrations(name).count).to eq(16)
     expect(config.registrations(:other).count).to eq(2)
   end
 
-  it "executes the normal handlers" do
+  def setup_handlers
     Wamp::Worker.subscribe_topics(name, proxy, session)
     Wamp::Worker.register_procedures(name, proxy, session)
+  end
+
+  it "executes the normal handlers" do
+    setup_handlers
 
     expect{
       session.publish("topic", nil, nil)
@@ -33,7 +37,8 @@ describe Wamp::Worker::Handler do
       end
 
       session.call("throw_exception", nil, nil) do |result, error, details|
-        expect(error[:error]).to eq("error")
+        expect(error[:error]).to eq("wamp.error.runtime")
+        expect(error[:args][0]).to eq("error")
       end
 
       session.call("call_result", [3], nil) do |result, error, details|
@@ -56,8 +61,7 @@ describe Wamp::Worker::Handler do
   end
 
   it "executes the background handlers" do
-    Wamp::Worker.subscribe_topics(name, proxy, session)
-    Wamp::Worker.register_procedures(name, proxy, session)
+    setup_handlers
 
     queue_count = 0
     queue_params = nil
@@ -72,25 +76,86 @@ describe Wamp::Worker::Handler do
       session.publish("back.topic", nil, nil)
 
       session.call("back.return_error", nil, nil)
-      expect(queue_params[:error][:error]).to eq("error")
+      expect(queue_params[:error]).to eq("error")
 
       session.call("back.throw_error", nil, nil)
-      expect(queue_params[:error][:error]).to eq("error")
+      expect(queue_params[:error]).to eq("error")
 
       session.call("back.throw_exception", nil, nil)
-      expect(queue_params[:error][:error]).to eq("wamp.error.runtime")
+      expect(queue_params[:error]).to eq("wamp.error.runtime")
 
       session.call("back.call_result", [3], nil)
-      expect(queue_params[:result][:args][0]).to eq(5)
+      expect(queue_params[:args][0]).to eq(5)
 
       session.call("back.normal_result", [3], nil)
-      expect(queue_params[:result][:args][0]).to eq(6)
+      expect(queue_params[:args][0]).to eq(6)
 
       session.call("back.nil_result", [3], nil)
-      expect(queue_params[:result][:args][0]).to eq(nil)
+      expect(queue_params[:args][0]).to eq(nil)
     }.to change{ BackgroundHandler.run_count }.by(7)
 
     expect(queue_count).to eq(6)
+  end
+
+  context "progress" do
+    before(:each) {
+      setup_handlers
+    }
+
+    it "reports the progress in the foreground" do
+      count = 0
+
+      session.call("progress_result", [3], nil, { receive_progress: true }) do |result, error, details|
+        case count
+        when 0
+          expect(result[:args][0]).to eq(0)
+          expect(details[:progress]).to eq(true)
+        when 1
+          expect(result[:args][0]).to eq(0.5)
+          expect(details[:progress]).to eq(true)
+        when 2
+          expect(result[:args][0]).to eq(1.0)
+          expect(details[:progress]).to eq(true)
+        else
+          expect(result[:args][0]).to eq(7)
+          expect(details[:progress]).not_to eq(true)
+        end
+
+        count += 1
+      end
+
+      expect(count).to eq(4)
+    end
+
+    it "reports the progress in the background" do
+      count = 0
+
+      allow_any_instance_of(Wamp::Worker::Queue).to receive(:push) do |queue, queue_name, command, params, handle|
+        result = params[:result]
+        options = params[:options]
+
+        case count
+        when 0
+          expect(result[:args][0]).to eq(0)
+          expect(options[:progress]).to eq(true)
+        when 1
+          expect(result[:args][0]).to eq(0.5)
+          expect(options[:progress]).to eq(true)
+        when 2
+          expect(result[:args][0]).to eq(1.0)
+          expect(options[:progress]).to eq(true)
+        else
+          expect(result[:args][0]).to eq(7)
+          expect(options[:progress]).not_to eq(true)
+        end
+
+        count += 1
+      end
+
+      session.call("back.progress_result", [3], nil, { receive_progress: true })
+
+      expect(count).to eq(4)
+    end
   end
 
 end

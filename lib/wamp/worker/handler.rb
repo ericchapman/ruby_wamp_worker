@@ -1,5 +1,5 @@
 require_relative "proxy/backgrounder"
-require 'wamp/client/defer'
+require 'wamp/client/response'
 require 'json'
 
 module Wamp
@@ -7,7 +7,7 @@ module Wamp
 
     module BaseHandler
       def self.included(base)
-        attr_reader :proxy, :command, :args, :kwargs, :details
+        attr_reader :proxy, :command, :args, :kwargs, :details, :background
 
         base.extend(ClassMethods)
       end
@@ -49,12 +49,30 @@ module Wamp
 
       # Configures the handler
       #
-      def configure(proxy, command, args, kwargs, details)
+      def configure(proxy, command, args, kwargs, details, background=false)
         @proxy = proxy
         @command = command
         @args = args || []
         @kwargs = kwargs || {}
         @details = details || {}
+        @background = background
+      end
+
+      # This method will send progress of the call to the caller
+      #
+      # @param result - The value you would like to send to the caller for progress
+      def progress(result)
+
+        # Only allow progress if it is a procedure and the client set "receive_progress"
+        if command.to_sym == :procedure and self.details[:receive_progress]
+
+          # Get the request ID
+          request = self.details[:request]
+
+          # Send the data back to the
+          self.session.yield request, result, { progress: true }, self.background
+        end
+
       end
 
     end
@@ -101,54 +119,6 @@ module Wamp
         self.proxy
       end
 
-      # Method that is run when the process is invoked on the worker
-      #
-      # @param method [Symbol] - The name of the method to execute
-      # @param command [Symbol] - The command that is being backgrounded
-      # @param args [Array] - The arguments for the handler
-      # @param kwargs [Hash] - The keyword arguments for the handler
-      # @param details [Hash] - Other details about the call
-      def perform(method, proxy_name, proxy_handle, command, args, kwargs, details)
-
-        # Create a proxy to act like the session.  Use a backgrounder so we also
-        # get the "yield" method
-        @proxy = Proxy::Backgrounder.new(proxy_name, proxy_handle)
-
-        # Deserialize the arguments as symbols
-        args = JSON.parse(args, :symbolize_names => true)
-        kwargs = JSON.parse(kwargs, :symbolize_names => true)
-        details = JSON.parse(details, :symbolize_names => true)
-
-        # Get the st ID
-        request = details[:request]
-
-        # Add the proxy to the details as a "session"
-        details[:session] = self.proxy
-
-        # Configure the handler
-        self.configure(self.proxy, command, args, kwargs, details)
-
-        # Call the user code and make sure to catch exceptions
-        begin
-          result = self.send(method)
-        rescue Wamp::Client::CallError => e
-          result = e
-        rescue StandardError => e
-          result = Wamp::Client::CallError.new('wamp.error.runtime', [e.to_s])
-        end
-
-        # Only return the response if it is a procedure
-        if command.to_sym == :procedure
-
-          # Manipulate the result to be serialized
-          response = Wamp::Worker::Proxy::Response.from_result(result)&.to_hash || {}
-
-          # Send the data back to the
-          self.proxy.yield request, response, {}, true
-
-        end
-      end
-
       # Override the invoke method to push the process to the background
       #
       def invoke(method)
@@ -172,15 +142,55 @@ module Wamp
             details.to_json)
 
         # If it is a procedure, return a defer
-        if self.command == :procedure
-          Wamp::Client::Defer::CallDefer.new
+        if self.command.to_sym == :procedure
+          Wamp::Client::Response::CallDefer.new
         else
           nil
         end
 
       end
 
+      # Method that is run when the process is invoked on the worker
       #
+      # @param method [Symbol] - The name of the method to execute
+      # @param command [Symbol] - The command that is being backgrounded
+      # @param args [Array] - The arguments for the handler
+      # @param kwargs [Hash] - The keyword arguments for the handler
+      # @param details [Hash] - Other details about the call
+      def perform(method, proxy_name, proxy_handle, command, args, kwargs, details)
+
+        # Create a proxy to act like the session.  Use a backgrounder so we also
+        # get the "yield" method
+        proxy = Proxy::Backgrounder.new(proxy_name, proxy_handle)
+
+        # Deserialize the arguments as symbols
+        args = JSON.parse(args, :symbolize_names => true)
+        kwargs = JSON.parse(kwargs, :symbolize_names => true)
+        details = JSON.parse(details, :symbolize_names => true)
+
+        # Get the request ID
+        request = details[:request]
+
+        # Add the proxy to the details as a "session"
+        details[:session] = self.session
+
+        # Configure the handler
+        self.configure(proxy, command, args, kwargs, details, true)
+
+        # Call the user code and make sure to catch exceptions
+        result = Wamp::Client::Response.invoke_handler do
+          self.send(method)
+        end
+
+        # Only return the response if it is a procedure
+        if command.to_sym == :procedure
+
+          # Send the data back to the
+          self.session.yield request, result, {}, true
+
+        end
+      end
+
     end
   end
 end

@@ -64,11 +64,13 @@ describe Wamp::Worker::Runner do
   end
 
   it "increments the ticker" do
-    expect(runner.dispatcher.ticker.get(runner.dispatcher.ticker_key)).to eq(0)
-    execute_runner do
-      sleep(2)
-    end
-    expect(runner.dispatcher.ticker.get(runner.dispatcher.ticker_key)).to eq(2)
+    expect(runner.dispatcher.ticker.get).to eq(0)
+
+    expect {
+      execute_runner do
+        sleep(2.5)
+      end
+    }.to change{ runner.dispatcher.ticker.get }.by(3)
   end
 
   context "challenge" do

@@ -21,7 +21,7 @@ module Wamp
         # Increments the ticker
         #
         def increment_ticker
-          self.ticker.increment(self.ticker_key)
+          self.ticker.increment
         end
 
         # Check the queues
@@ -78,19 +78,19 @@ module Wamp
             options = descriptor.params[:options]
             check_defer = descriptor.params[:check_defer]
             result_hash = descriptor.params[:result] || {}
-            result = Response.from_hash(result_hash)
 
-            self.session.yield(request, result.object, options, check_defer)
+            # Get the response from the descriptor params
+            result = Wamp::Client::Response.from_hash(result_hash)
+
+            self.session.yield(request, result, options, check_defer)
 
           else
 
             # Return error if the command is not supported
-            error = {
-                error: "unsupported proxy command '#{descriptor.command}'",
-                args: descriptor.params[:args],
-                kwargs: descriptor.params[:kwargs],
-            }
-            callback.call(nil, error, {})
+            error = Wamp::Client::Response::CallError.new(
+                Wamp::Client::Response::DEFAULT_ERROR,
+                ["unsupported proxy command '#{descriptor.command}'"])
+            callback.call(nil, error.to_hash, {})
 
           end
 

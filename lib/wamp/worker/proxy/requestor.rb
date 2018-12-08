@@ -55,7 +55,7 @@ module Wamp
           if wait
 
             # Store the start ticker
-            start_tick = self.ticker.get(self.ticker_key)
+            start_tick = self.ticker.get
 
             # Wait for the response
             descriptor = self.queue.pop(handle, wait: true, delete: true)
@@ -64,7 +64,7 @@ module Wamp
             if descriptor == nil
 
               # If the ticker never incremented, throw a "worker not responding" error
-              current_tick = self.ticker.get(self.ticker_key)
+              current_tick = self.ticker.get
               if start_tick == current_tick
                 raise(RuntimeError, "worker '#{self.name}' is not responding")
               else

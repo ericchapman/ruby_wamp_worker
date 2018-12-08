@@ -1,65 +1,10 @@
+require "wamp/client/response"
 require_relative "../ticker"
 require_relative "../queue"
 
 module Wamp
   module Worker
     module Proxy
-
-      # This class is used to convert responses between the different API calls
-      #
-      class Response
-        attr_reader :object
-
-        # Constructor
-        #
-        # @param object [CallResult, CallError] - The object
-        def initialize(object)
-          @object = object
-        end
-
-        # Method to create the response from a hash
-        #
-        # @param hash [Hash] - The has to parse the response out of
-        # @return [Response] - The new response
-        def self.from_hash(hash)
-          result = hash[:result]
-          error = hash[:error]
-
-          if result != nil
-            self.new(Wamp::Client::CallResult.new(result[:args], result[:kwargs]))
-          elsif error != nil
-            self.new(Wamp::Client::CallError.new(error[:error], error[:args], error[:kwargs]))
-          else
-            self.new(Wamp::Client::CallResult.new)
-          end
-        end
-
-        # Method to create the response from a result
-        #
-        # @return [Response] - The new response
-        def self.from_result(result)
-          if result.is_a?(Wamp::Client::Defer::CallDefer)
-            nil
-          elsif result.is_a?(Wamp::Client::CallError) or result.is_a?(Wamp::Client::CallResult)
-            self.new(result)
-          else
-            self.new(Wamp::Client::CallResult.new([result]))
-          end
-        end
-
-        # This converts the object to a hash
-        #
-        # @return [Hash] - The generated hash
-        def to_hash
-          if self.object.is_a? Wamp::Client::CallResult
-            { result: { args: self.object.args, kwargs: self.object.kwargs } }
-          elsif self.object.is_a? Wamp::Client::CallError
-            { error: { error: self.object.error, args: self.object.args, kwargs: self.object.kwargs } }
-          else
-            {}
-          end
-        end
-      end
 
       class Base
         attr_reader :queue, :ticker, :name, :uuid
@@ -148,12 +93,6 @@ module Wamp
         #     - if the pop comes back "nil", it means we timed out
         #     - if the value of the ticker is that same as before, then th worker is not running
 
-        # Returns the key for the ticker
-        #
-        # @return [String] - The key for the ticker
-        def ticker_key
-          "wamp:#{self.name}:tick"
-        end
         #endregion
 
       end

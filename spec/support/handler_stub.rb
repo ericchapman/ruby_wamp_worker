@@ -6,12 +6,12 @@ class Handler
 
   def return_error
     self.class.increment_run_count
-    Wamp::Client::CallError.new("error")
+    Wamp::Client::Response::CallError.new("error")
   end
 
   def throw_error
     self.class.increment_run_count
-    raise Wamp::Client::CallError.new("error")
+    raise Wamp::Client::Response::CallError.new("error")
   end
 
   def throw_exception
@@ -21,7 +21,7 @@ class Handler
 
   def call_result
     self.class.increment_run_count
-    Wamp::Client::CallResult.new([(self.args[0] + 2)])
+    Wamp::Client::Response::CallResult.new([(self.args[0] + 2)])
   end
 
   def normal_result
@@ -41,6 +41,14 @@ class Handler
       response = result[:args][0]
     end
     response
+  end
+
+  def progress_result
+    self.class.increment_run_count
+    self.progress(0)
+    self.progress(0.5)
+    self.progress(1.0)
+    self.args[0] + 4
   end
 
 end
@@ -67,6 +75,7 @@ class NormalHandler < Handler
   register "normal_result", :normal_result
   register "nil_result", :nil_result
   register "proxy_result", :proxy_result
+  register "progress_result", :progress_result
 end
 
 class BackgroundHandler < Handler
@@ -90,6 +99,7 @@ class BackgroundHandler < Handler
   register "back.normal_result", :normal_result
   register "back.nil_result", :nil_result
   register "back.proxy_result", :proxy_result
+  register "back.progress_result", :progress_result
 end
 
 

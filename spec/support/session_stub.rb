@@ -1,10 +1,11 @@
 class SessionStub
-  attr_reader :subscriptions, :registrations, :defers
+  attr_reader :subscriptions, :registrations, :defers, :calls
 
   def initialize
     @subscriptions = {}
     @registrations = {}
     @defers = {}
+    @calls = {}
   end
 
   def publish(topic, args=nil, kwargs=nil, options={}, &callback)
@@ -14,7 +15,7 @@ class SessionStub
     if subscription
       subscription.call(args, kwargs, {})
     else
-      error = { error: "no subscriber found", args:[], kwargs:{} }
+      error = Wamp::Client::Response::CallError.new("wamp.no_subscriber").to_hash
     end
 
     if callback and options[:acknowledge]
@@ -26,35 +27,28 @@ class SessionStub
     registration = self.registrations[procedure]
     request = SecureRandom.uuid
 
+    self.calls[request] = callback
+
     if registration
+      details = options.clone
+      details[:request] = request
 
-      # Perform the API call
-      begin
-        result = registration.call(args, kwargs, {request: request})
-      rescue Wamp::Client::CallError => e
-        result = e
-      rescue StandardError
-        result = Wamp::Client::CallError.new("error")
-      end
-
-      # Parse the response
-      unless result.is_a?(Wamp::Client::Defer::CallDefer)
-        response = Wamp::Worker::Proxy::Response.from_result(result)&.to_hash || {}
-        result = response[:result]
-        error = response[:error]
+      result = Wamp::Client::Response.invoke_handler do
+        registration.call(args, kwargs, details)
       end
     else
-      result = nil
-      error = { error: "no registration found", args:[], kwargs:{} }
+      result = Wamp::Client::Response::CallError.new("wamp.no_procedure")
     end
 
     if callback
-      if result.is_a?(Wamp::Client::Defer::CallDefer)
+      if result.is_a?(Wamp::Client::Response::CallDefer)
         self.defers[request] = callback
       else
-        callback.call(result, error, { procedure: procedure })
+        self.yield(request, result, options)
       end
     end
+
+    self.calls.delete(request)
   end
 
   def register(procedure, handler, options=nil, interrupt=nil, &callback)
@@ -74,11 +68,32 @@ class SessionStub
   end
 
   def yield(request, result, options={}, check_defer=false)
-    callback = self.defers.delete(request)
 
+    # Get the callback
+    callback =
+        if check_defer
+          callback = self.defers[request]
+          self.defers.delete(request) unless options[:progress]
+          callback
+        else
+          self.calls[request]
+        end
+
+    # If there is a callback, handle it
     if callback
-      response = Wamp::Worker::Proxy::Response.from_result(result)&.to_hash || {}
-      callback.call(response[:result], response[:error], { request: request })
+
+      # Create the response object
+      result = Wamp::Client::Response::CallResult.ensure(result, allow_error: true)
+
+      # Create the details
+      details = { request: request, progress: options[:progress] }
+
+      # Call the callback
+      if result.is_a?(Wamp::Client::Response::CallError)
+        callback.call(nil, result.to_hash, details)
+      else
+        callback.call(result.to_hash, nil, details)
+      end
     end
 
   end

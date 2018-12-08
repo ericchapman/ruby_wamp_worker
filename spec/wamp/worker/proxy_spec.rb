@@ -43,7 +43,7 @@ describe Wamp::Worker::Proxy do
 
   context "command/response flow" do
 
-    it "executes a 'call' command" do
+    it "executes a call command" do
       expect {
         check_method(1, :call, "normal_result", [7]) do |result, error|
           expect(result[:args][0]).to eq(10)
@@ -52,16 +52,16 @@ describe Wamp::Worker::Proxy do
       }.to change{ NormalHandler.run_count }.by(1)
     end
 
-    it "executes a 'call' command with invalid procedure" do
+    it "executes a call command with invalid procedure" do
       expect {
         check_method(1, :call, "invalid_procedure", [7]) do |result, error|
           expect(result).to be_nil
-          expect(error).to eq({ error: "no registration found", args:[], kwargs:{} })
+          expect(error).to eq({ error: "wamp.no_procedure", args:[], kwargs:{} })
         end
       }.to change{ NormalHandler.run_count }.by(0)
     end
 
-    it "executes a 'call' command with throw error" do
+    it "executes a call command with throw error" do
       expect {
         check_method(1, :call, "throw_error", [7]) do |result, error|
           expect(result).to be_nil
@@ -70,7 +70,7 @@ describe Wamp::Worker::Proxy do
       }.to change{ NormalHandler.run_count }.by(1)
     end
 
-    it "executes a 'publish' command w/o acknowledge" do
+    it "executes a publish command w/o acknowledge" do
       expect {
         check_method(1, :publish, "topic", [7]) do |result, error|
           expect(result).to be_nil
@@ -79,7 +79,7 @@ describe Wamp::Worker::Proxy do
       }.to change{ NormalHandler.run_count }.by(1)
     end
 
-    it "executes a 'publish' command w/ acknowledge" do
+    it "executes a publish command w/ acknowledge" do
       expect {
         check_method(1, :publish, "topic", [7], {}, { acknowledge: true }) do |result, error|
           expect(result).to eq(1234)
@@ -88,11 +88,11 @@ describe Wamp::Worker::Proxy do
       }.to change{ NormalHandler.run_count }.by(1)
     end
 
-    it "executes a 'publish' command w/ acknowledge and error" do
+    it "executes a publish command w/ acknowledge and error" do
       expect {
         check_method(1, :publish, "invalid_topic", [7], {}, { acknowledge: true }) do |result, error|
           expect(result).to eq(1234)
-          expect(error).to eq({ error: "no subscriber found", args:[], kwargs:{} })
+          expect(error).to eq({ error: "wamp.no_subscriber", args:[], kwargs:{} })
         end
       }.to change{ NormalHandler.run_count }.by(0)
     end
@@ -105,7 +105,8 @@ describe Wamp::Worker::Proxy do
 
       descriptor = requestor.queue.pop("handle")
       expect(descriptor.command).to eq(:bad)
-      expect(descriptor.params[:error][:error]).to eq("unsupported proxy command 'bad'")
+      expect(descriptor.params[:error][:error]).to eq("wamp.error.runtime")
+      expect(descriptor.params[:error][:args][0]).to eq("unsupported proxy command 'bad'")
     end
   end
 
