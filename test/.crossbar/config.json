@@ -1,0 +1,109 @@
+{
+  "version": 2,
+  "workers": [
+    {
+      "type": "router",
+      "realms": [
+        {
+          "name": "realm1",
+          "roles": [
+            {
+              "name": "anonymous",
+              "permissions": [
+                {
+                  "uri": "com.",
+                  "match": "prefix",
+                  "allow": {
+                    "call": true,
+                    "register": true,
+                    "publish": true,
+                    "subscribe": true
+                  },
+                  "disclose": {
+                    "caller": false,
+                    "publisher": false
+                  },
+                  "cache": true
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "transports": [
+        {
+          "type": "web",
+          "endpoint": {
+            "type": "tcp",
+            "port": 8080
+          },
+          "paths": {
+            "/": {
+              "type": "static",
+              "directory": "../web"
+            },
+            "ws": {
+              "type": "websocket"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "container",
+      "options": {
+        "pythonpath": [
+          ".."
+        ]
+      },
+      "components": [
+        {
+          "type": "class",
+          "classname": "hello.AppSession",
+          "realm": "realm1",
+          "transport": {
+            "type": "websocket",
+            "endpoint": {
+              "type": "tcp",
+              "host": "127.0.0.1",
+              "port": 8080
+            },
+            "url": "ws://127.0.0.1:8080/ws"
+          }
+        }
+      ]
+    },
+    {
+      "type": "guest",
+      "executable": "redis-server",
+      "arguments": [],
+      "options": {
+        "workdir": "../.crossbar/"
+      }
+    },
+    {
+      "type": "guest",
+      "executable": "bundle",
+      "arguments": ["exec", "rails", "server"],
+      "options": {
+        "workdir": "../wamp_test/"
+      }
+    },
+    {
+      "type": "guest",
+      "executable": "bundle",
+      "arguments": ["exec", "wamp-worker","-l debug"],
+      "options": {
+        "workdir": "../wamp_test/"
+      }
+    },
+    {
+      "type": "guest",
+      "executable": "bundle",
+      "arguments": ["exec", "sidekiq", "-e development", "-C config/sidekiq.yml"],
+      "options": {
+        "workdir": "../wamp_test/"
+      }
+    }
+  ]
+}
