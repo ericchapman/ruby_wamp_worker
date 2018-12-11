@@ -1,7 +1,7 @@
 # Wamp::Worker
 
-[![Gem Version](https://badge.fury.io/rb/wamp-worker.svg)](https://badge.fury.io/rb/wamp_client)
-[![Circle CI](https://circleci.com/gh/ericchapman/ruby_wamp_worker/tree/master.svg?&style=shield&circle-token=92813c17f9c9510c4c644e41683e7ba2572e0b2a)](https://circleci.com/gh/ericchapman/ruby_wamp_worker/tree/master)
+[![Gem Version](https://badge.fury.io/rb/wamp-worker.svg)](https://badge.fury.io/rb/wamp-worker)
+[![CI Status](https://travis-ci.org/ericchapman/ruby_wamp_worker.svg?branch=master)](https://travis-ci.org/ericchapman/ruby_wamp_worker)
 [![Codecov](https://img.shields.io/codecov/c/github/ericchapman/ruby_wamp_worker/master.svg)](https://codecov.io/github/ericchapman/ruby_wamp_worker)
 
 Rails worker for talking to a WAMP Router which is described [here](https://tools.ietf.org/html/draft-oberstet-hybi-tavendo-wamp-02)
