@@ -11,3 +11,4 @@
 /test/wamp_test/log/
 *.pyc
 .idea/
+*.gem

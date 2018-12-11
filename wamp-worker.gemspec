@@ -27,6 +27,6 @@ Gem::Specification.new do |spec|
 
   spec.required_ruby_version = '>= 2.3'
 
-  spec.add_dependency 'wamp_client', '~> 0.2.0'
+  spec.add_dependency 'wamp_client', '~> 0.2.2'
   spec.add_dependency 'redis', '~> 4.0'
 end

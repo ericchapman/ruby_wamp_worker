@@ -13,13 +13,13 @@ require "redis"
 module Wamp
   module Worker
 
-    # Used to include a requestor in a rails class
+    # Used to include a requestor in any class
     #
     class Session
       def self.new(name=nil, method: :wamp_session)
         name ||= DEFAULT
         Module.new do
-          define_method(method) { Wamp::Worker.requestor(name) }
+          define_method(method) { Proxy::Requestor.new(name) }
         end
       end
     end
@@ -36,12 +36,7 @@ module Wamp
     # Returns the logger object
     #
     def self.logger
-      unless defined?(@logger)
-        $stdout.sync = true unless ENV['RAILS_ENV'] == "production"
-        @logger = Logger.new $stdout
-        @logger.level = Logger::INFO
-      end
-      @logger
+      Wamp::Client.logger
     end
 
     # Sets the log level
@@ -49,20 +44,6 @@ module Wamp
     # @param log_level [Symbol] - the desired log level
     def self.log_level=(log_level)
       Wamp::Client.log_level = log_level
-      level =
-          case log_level
-          when :error
-            Logger::ERROR
-          when :debug
-            Logger::DEBUG
-          when :fatal
-            Logger::FATAL
-          when :warn
-            Logger::WARN
-          else
-            Logger::INFO
-          end
-      self.logger.level = level
     end
 
     # Method to configure the worker
@@ -75,7 +56,7 @@ module Wamp
     # Method to start a worker
     #
     # @param name [Symbol] - The name of the connection
-    def self.run(name, **args)
+    def self.run(name=nil, **args)
       name ||= DEFAULT
 
       # Get the connection info
@@ -83,17 +64,6 @@ module Wamp
 
       # Create the runner and start it
       Runner::Main.new(name, **options).start
-    end
-
-    # Returns a requestor for objects to perform calls to the worker
-    #
-    # @param name [Symbol] - The name of the connection
-    # @return [Wamp::Worker::Proxy::Requestor] - An object that can be used to make requests
-    def self.requestor(name)
-      name ||= DEFAULT
-
-      # Create a requestor proxy for the connection
-      Proxy::Requestor.new(name)
     end
 
     # Registers procedures
@@ -107,8 +77,14 @@ module Wamp
           self.logger.debug("#{self.name} invoking handler '#{r.klass}##{r.method}' for procedure '#{r.procedure}'")
           r.klass.create(proxy, :procedure, a, k, d).invoke(r.method)
         }
-        session.register(r.procedure, handler, r.options)
-        self.logger.info("#{self.name} register '#{r.klass}##{r.method}' for procedure '#{r.procedure}'")
+        session.register(r.procedure, handler, r.options) do |result, error, details|
+          if error
+            self.logger.error("#{self.name} register failed '#{r.klass}##{r.method}' for procedure '#{r.procedure}'")
+            self.logger.error("   error: #{error.inspect}")
+          else
+            self.logger.info("#{self.name} registered for '#{r.klass}##{r.method}' for procedure '#{r.procedure}'")
+          end
+        end
       end
     end
 
@@ -123,8 +99,14 @@ module Wamp
           self.logger.debug("#{self.name} invoking handler '#{s.klass}##{s.method}' for subscription '#{s.topic}'")
           s.klass.create(proxy, :subscription, a, k, d).invoke(s.method)
         }
-        session.subscribe(s.topic, handler, s.options)
-        self.logger.info("#{self.name} subscribe '#{s.klass}##{s.method}' for topic '#{s.topic}'")
+        session.subscribe(s.topic, handler, s.options) do |result, error, details|
+          if error
+            self.logger.error("#{self.name} subscribe failed '#{s.klass}##{s.method}' for topic '#{s.topic}'")
+            self.logger.error("   error: #{error.inspect}")
+          else
+            self.logger.info("#{self.name} subscribed '#{s.klass}##{s.method}' for topic '#{s.topic}'")
+          end
+        end
       end
     end
 

@@ -92,8 +92,9 @@
     {
       "type": "guest",
       "executable": "bundle",
-      "arguments": ["exec", "wamp-worker","-l debug"],
+      "arguments": ["exec", "wamp-worker", "-e development", "-l debug"],
       "options": {
+        "env" : { "inherit": true, "vars": { "DYNO": "1234" } },
         "workdir": "../wamp_test/"
       }
     },

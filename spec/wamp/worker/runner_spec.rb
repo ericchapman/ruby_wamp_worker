@@ -3,7 +3,7 @@ require "spec_helper"
 describe Wamp::Worker::Runner do
   let(:name) { :other }
   let(:runner) { described_class::Main.new(name) }
-  let(:requestor) { Wamp::Worker.requestor(name) }
+  let(:requestor) { Wamp::Worker::Proxy::Requestor.new(name) }
 
   def execute_runner
 

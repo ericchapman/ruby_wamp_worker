@@ -42,6 +42,9 @@ Some notes about Wamp::Worker
    
 ## Revision History
 
+ - v0.0.2:
+   - Updated to use Wamp::Client logger
+   - Other minor cleanup
  - v0.0.1:
    - Initial Release
 
@@ -65,8 +68,9 @@ Or install it yourself as:
 
 ### Configuration
 
-To configure Wamp::Worker, create a "config/initializers/wamp-worker.rb" file with the
-following options
+To configure Wamp::Worker, create a initializer file with the following options
+
+**config/initializers/wamp-worker.rb**
 
 ``` ruby
 Wamp::Worker.configure do
@@ -87,7 +91,8 @@ The attributes are defined as follows
 You can also "subscribe" and "register" in the configuration object.  That will be 
 described later.
 
-**Note that you MUST make sure "config.eager_load = true" is set in the environment files**
+**Note that you MUST make sure "config.eager_load = true" is set in the environment files
+located in "config/environments/\*.rb"**
 
 ### Multiple Workers
 
@@ -154,23 +159,17 @@ For Rails applications that have Sidekiq, you can push the processing of the han
 to the background by including "Wamp::Worker::BackgroundHandler" instead of
 "Wamp::Worker::Handler".
 
-### Rails Access
+### Call/Publish Methods
 
-The library also supports "call" and "publish" methods from Rails objects.  This is
-done by including "Wamp::Worker::Session" in your class.  For example
-
-**app/controllers/application_controller.rb**
-
-``` ruby
-class ApplicationController < ActionController::Base
-  include Wamp::Worker::Session.new
-end
-```
+The library also supports "call" and "publish" methods from objects outside of the
+worker.  This is done by including "Wamp::Worker::Session" in your class.  For example
 
 **app/controllers/add_controller.rb**
 
 ``` ruby
 class AddController < ApplicationController
+  include Wamp::Worker::Session.new
+  
   def index
     response = nil
 
@@ -183,22 +182,73 @@ class AddController < ApplicationController
 end
 ```
 
-Note that the name defaults to ":default" and the method ":wamp_session".  These
-can be overridden by including in the "include"
+Note that the name defaults to ":default" and the method "wamp_session".  These
+can be overridden by adding the following attributes to the "include"
+
+**app/controllers/add_controller.rb**
 
 ``` ruby
-class ApplicationController < ActionController::Base
-  include Wamp::Worker::Session.new :other, method: :different_session
+class AddController < ApplicationController
+  include Wamp::Worker::Session.new, :other, :different_session
+  
+  def index
+    response = nil
+
+    self.different_session.call "com.example.back.add", [params[:a].to_i, params[:b].to_i] do |result, error, details|
+      response = result
+    end
+
+    render json: { result: response }
+  end
 end
 ```
 
+This will talk to the ":other" worker and expose it using "different_session"
+rather than "wamp_session"
+
 ### Starting the Worker
+
+There are 2 different ways you can start a worker
+
+#### Rails/Heroku worker
 
 To start the worker, use the "wamp-worker" executable
 
     $ bundle exec wamp-worker
     
-this executable supports the following options
+This executable supports the following options
 
  - "-l" (default: "info"): logging level (debug, info, warn, error)
  - "-n" (default: "default"): name of the worker
+ - "-e" (default: "development"): application environment to load
+
+or in your Procfile for Heroku
+
+**Procfile**
+
+```
+web: bundle exec puma -C config/puma.rb
+worker: bundle exec wamp-worker -e production
+```
+
+#### Thread
+
+You can also spawn a thread inside if your application.  One way to do this
+is as follows
+
+**config/initializers/wamp-worker.rb**
+
+``` ruby
+require "thread"
+
+Thread.new do
+  Wamp::Worker.run uri: 'ws://127.0.0.1:8080/ws', realm: 'realm1'
+end
+```
+
+Note that this method is not recommended for scalable designs because it will
+create a new instance of the worker every time you scale the web instance.
+Only do this if you really know what you are doing.
+
+Also, when calling "register", you must include the "invoke" option.  See WAMP
+documentation for more details.

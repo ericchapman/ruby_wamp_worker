@@ -110,11 +110,6 @@ module Wamp
           @client = options[:client] || Wamp::Client::Connection.new(options)
           @active = false
 
-          # Log the event
-          logger.info("#{self.class.name} '#{self.name}' created with options")
-          logger.info("   uri: #{options[:uri]}")
-          logger.info("   realm: #{options[:realm]}")
-
           # Create a queue for passing messages to the main runner
           @descriptor_queue = ::Queue.new
 
